@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Weekly Calendar</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      margin: 20px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 10px;
+    }
+    .day {
+      border: 1px solid #ccc;
+      padding: 6px;
+      min-height: 120px;
+      background: #fff;
+      vertical-align: top;
+    }
+    .day.today {
+      background: #fff9c4; /* pale yellow */
+    }
+    .day.past {
+      background: #f5f5f5; /* light grey */
+    }
+    .day h3 {
+      margin: 0 0 5px;
+      font-size: 13px;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 3px;
+    }
+    .event {
+      margin-bottom: 6px;
+      padding: 3px;
+      border: 1px solid #eee;
+      background: #fafafa;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Weekly Calendar (<%= start || format(new Date(), 'yyyy-MM-dd') %> → <%= end || format(new Date(), 'yyyy-MM-dd') %>)</h1>
+
+  <div style="text-align:center; margin-bottom:20px;">
+    <% const safeStart = start || format(new Date(), 'yyyy-MM-dd'); %>
+
+    <a href="/api/functions/calendar/weekly?start=<%= safeStart %>&nav=prev">← Previous Week</a>
+    &nbsp; | &nbsp;
+    <a href="/api/functions/calendar/weekly?start=<%= safeStart %>&nav=next">Next Week →</a>
+
+    <form method="get" action="/api/functions/calendar/weekly" style="display:inline-block; margin-left:20px;">
+      <input type="date" name="start" value="<%= safeStart %>">
+      <button type="submit">Go</button>
+    </form>
+  </div>
+
+  <div class="calendar">
+    <% days.forEach(day => { %>
+      <div class="day <%= day.isToday ? 'today' : '' %> <%= day.isPast ? 'past' : '' %>">
+        <h3><%= day.dateStr %></h3>
+
+        <% if (events[day.dateKey] && events[day.dateKey].length > 0) { %>
+          <% events[day.dateKey].forEach(function(ev) { %>
+            <div class="event">
+              <a href="/api/functions/<%= ev.id %>/detail" target="_blank">
+                <strong><%= ev.event_name %></strong>
+              </a><br/>
+              <strong>Contact:</strong> <%= ev.contact_name %><br/>
+              <strong>Phone:</strong> <%= ev.contact_phone || "N/A" %><br/>
+              Room: <%= ev.room %><br/>
+              Guests: <%= ev.attendees %><br/>
+              Catering: <%= ev.catering ? "Yes" : "No" %><br/>
+              Bar: <%= ev.bar_service ? "Yes" : "No" %><br/>
+            </div>
+          <% }); %>
+        <% } else { %>
+          <div class="no-events">No events</div>
+        <% } %>
+      </div>
+    <% }) %>
+  </div>
+</body>
+</html>
