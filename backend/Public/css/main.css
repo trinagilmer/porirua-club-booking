@@ -1,0 +1,173 @@
+/* ================= Porirua Club UI Theme ================= */
+/* Brand */
+:root{
+  --primary:#6bb4de;   /* buttons, headings */
+  --accent:#85dbb8;    /* secondary highlights */
+  --bg:#ffffff;        /* page background */
+  --card:#ffffff;
+  --ink:#0a0a0a;       /* main text */
+  --muted:#6b7280;     /* secondary text */
+  --line:#e6edf2;      /* borders / separators */
+  --black:#0f1115;     /* black “menu block” */
+}
+
+/* Basics */
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:24px;
+  font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  line-height:1.45;
+}
+/* Allow <body class="pc-theme"> from views */
+.pc-theme{ background:var(--bg); color:var(--ink); }
+
+a{color:var(--primary);text-decoration:none}
+a:hover{text-decoration:underline}
+.muted{color:var(--muted)}
+
+/* Layout helpers */
+.container{max-width:1200px;margin:0 auto}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media (max-width:900px){.two,.three{grid-template-columns:1fr}}
+
+/* App header with logo */
+.app-header{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:12px 16px;border:1px solid var(--line);border-radius:14px;background:#fff;
+}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{height:40px;width:auto;display:block}
+.brand .title{font-weight:700;font-size:1.1rem;color:var(--ink)}
+.brand .subtitle{font-size:.9rem;color:var(--muted)}
+
+/* Page header (matches theme spec) */
+.pc-page-header h1{
+  color:var(--ink);
+  border-left:6px solid var(--primary);
+  padding-left:12px;
+  margin:0 0 8px 0;
+}
+.page-lead{margin-top:2px;color:var(--muted)}
+
+/* Top navigation chips */
+.navbar{display:flex;gap:8px;flex-wrap:wrap}
+.chip{
+  padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink);
+}
+.chip.active{border-color:var(--primary);box-shadow:0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent)}
+.chip.dark{background:var(--black);color:#fff;border-color:transparent}
+.chip.dark:hover{filter:brightness(1.05)}
+
+/* Optional: lighter dark nav blocks (alias for earlier snippets) */
+.pc-nav{ background:#1f2937; color:#fff; }
+.pc-nav a{ color:#fff; opacity:.9; }
+.pc-nav a:hover{ opacity:1; }
+
+/* Headings */
+h1,h2,h3{margin:0 0 8px 0;color:var(--primary)}
+
+/* Cards & KPI */
+.card{
+  border:1px solid var(--line);border-radius:14px;background:var(--card);padding:16px;
+}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+
+/* Existing KPI block */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.kpi{border:1px dashed var(--line);border-radius:12px;background:#fff;padding:12px}
+.kpi .value{font-size:1.6rem}
+
+/* Aliases to support new EJS (pc-kpis / kpi-card) */
+.pc-kpis{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0 24px}
+.kpi-card{background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:12px 16px;min-width:160px}
+.kpi-card .kpi-label{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.kpi-card .kpi-value{font-size:1.75rem;font-weight:700;color:#0b2233}
+
+/* Inputs / Buttons */
+input,select,textarea,button,.btn{
+  padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)
+}
+input:focus,select:focus,textarea:focus,button:focus{outline:2px solid color-mix(in srgb, var(--primary) 40%, transparent);outline-offset:1px}
+.btn{cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn.primary{background:var(--primary);color:#fff;border-color:transparent}
+.btn.primary:hover{filter:brightness(0.98)}
+.btn.accent{background:var(--accent);color:#0b3b2d;border-color:transparent}
+.btn.ghost{background:#fff;color:var(--primary);border-color:var(--primary)}
+.btn.dark{background:var(--black);color:#fff;border-color:transparent}
+.btn.danger{background:#fff;color:#b91c1c;border-color:#fecaca}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line)}
+th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{
+  background: color-mix(in srgb, var(--primary) 8%, #fff);
+  color:#09374d; position:sticky; top:0; z-index:1;
+}
+
+/* Alias for pc-table used in views */
+.pc-table{width:100%;border-collapse:collapse}
+.pc-table th,.pc-table td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.pc-table thead th{
+  background: color-mix(in srgb, var(--primary) 8%, #fff);
+  color:#09374d; position:sticky; top:0; z-index:1;
+}
+
+/* Status pills (existing) */
+.pill{padding:4px 8px;border-radius:999px;font-size:.8rem;display:inline-block;text-transform:capitalize}
+.pill.confirmed{background:#e7f7f0;color:#0b3a2e;border:1px solid color-mix(in srgb, var(--accent) 45%, #fff)}
+.pill.cancelled{background:#fff5f5;color:#7f1d1d;border:1px solid #f9c6c6}
+/* Add pending (blue ring) */
+.pill.pending{background:#fff;color:#0b2233;border:1px solid color-mix(in srgb, var(--primary) 45%, #fff)}
+
+/* Status badges (aliases for new markup: .status-badge status-*) */
+.status-badge{display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid transparent;font-size:.8rem;font-weight:600;text-transform:capitalize}
+.status-pending{background:#fff;border-color:color-mix(in srgb, var(--primary) 45%, #fff);color:#0b2233}
+.status-confirmed{background:#e7f7f0;border-color:color-mix(in srgb, var(--accent) 45%, #fff);color:#0b3a2e}
+.status-cancelled{background:#fff5f5;border-color:#ef4444;color:#7f1d1d}
+
+/* “Black menu blocks” – light-touch cards */
+.menu-block{
+  background:var(--black);color:#fff;border-radius:14px;padding:14px;border:1px solid #1f2430;
+}
+.menu-block .btn{background:#fff;color:var(--black);border-color:transparent}
+.menu-block h3{color:#fff}
+
+/* Calendar helpers */
+.calendar .legend{margin:6px 0;color:var(--muted);font-size:.92rem}
+.calendar .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:12px}
+.calendar .cell{border:1px solid var(--line);min-height:120px;padding:8px;background:#fff;border-radius:10px}
+.calendar .head{font-weight:600;margin-bottom:6px}
+.calendar .today{outline:2px solid color-mix(in srgb, var(--primary) 50%, transparent)}
+.calendar .other{background:#fafafa}
+.i{padding:2px 6px;border-radius:10px;font-size:.75rem;border:1px solid var(--line)}
+.i.fn{background:#eef2ff;color:#3730a3;border-color:#c7d2fe}
+.i.bk{background:#f3f4f6;color:#374151;border-color:#e5e7eb}
+.ev.bk{color:#6b7280}
+
+/* Toast (edit page) */
+.toast{position:fixed;bottom:16px;right:16px;background:#111;color:#fff;padding:10px 12px;border-radius:8px;display:none}
+.toast.error{background:#b91c1c}
+
+/* Print-friendly (run sheets) */
+@media print{
+  body{margin:0;background:#fff}
+  .app-header,.toolbar,.btn,.chip,.navbar,.no-print{display:none !important}
+  .card{border-color:#bbb}
+  table,th,td{border:1px solid #bbb}
+  th{background:#f2f6fb !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .card,table{page-break-inside:avoid}
+}
+
+/* Optional dark mode (auto) */
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0b0e13; --card:#121620; --ink:#e5e7eb; --muted:#9aa3b2; --line:#1f2532; }
+  th{background:#141a26;color:#cfe8f7}
+  .btn.ghost{color:var(--primary);border-color:color-mix(in srgb, var(--primary) 55%, #141a26)}
+}
+

@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Edit Function – <%= fn.event_name %></title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+    .section{margin:20px 0}
+    label{display:block;margin:6px 0}
+    textarea{min-height:72px}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{border:1px solid var(--line);padding:8px;vertical-align:top}
+    th{background:color-mix(in srgb, var(--primary) 8%, #fff)}
+  </style>
+</head>
+<body class="pc-theme">
+  <header class="pc-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;">
+    <div>
+      <h1>Edit Function</h1>
+      <p class="page-lead muted"><%= fn.event_name %></p>
+    </div>
+    <nav class="navbar">
+      <a href="/staff/bookings" class="chip">Enquiries</a>
+      <a href="/staff/functions" class="chip">Functions</a>
+    </nav>
+  </header>
+
+  <form id="editForm" data-id="<%= fn.id %>" class="card">
+    <!-- Status row -->
+    <div class="grid">
+      <label>Status
+        <select name="status" id="status">
+          <option value="pending"   <%= fn.status === 'pending'   ? 'selected' : '' %>>Pending</option>
+          <option value="confirmed" <%= fn.status === 'confirmed' ? 'selected' : '' %>>Confirmed</option>
+          <option value="cancelled" <%= fn.status === 'cancelled' ? 'selected' : '' %>>Cancelled</option>
+        </select>
+      </label>
+      <div>
+        <div class="muted">Current</div>
+        <% const s = (fn.status || 'pending').toLowerCase(); %>
+        <span class="status-badge status-<%= s %>"><%= s %></span>
+      </div>
+    </div>
+
+    <!-- Function Info -->
+    <div class="section">
+      <div class="grid">
+        <label>Event Name
+          <input type="text" name="event_name" value="<%= fn.event_name || '' %>" required>
+        </label>
+
+        <label>Room
+          <select name="room" required>
+            <% rooms.forEach(r => { %>
+              <option value="<%= r.name %>" <%= fn.room === r.name ? "selected" : "" %>><%= r.name %></option>
+            <% }) %>
+          </select>
+        </label>
+
+        <label>Attendees
+          <input type="number" min="0" step="1" name="attendees" value="<%= fn.attendees || 0 %>">
+        </label>
+
+        <label>Event Date
+          <input type="date" name="event_date" value="<%= fn.event_date ? String(fn.event_date).slice(0,10) : '' %>">
+        </label>
+
+        <label>Event Time
+          <input type="time" name="event_time" value="<%= fn.event_time ? String(fn.event_time).slice(0,5) : '' %>">
+          <div class="muted">24-hour format (e.g. 18:00)</div>
+        </label>
+      </div>
+
+      <div class="grid">
+        <label>
+          <input type="checkbox" name="catering" <%= fn.catering ? "checked" : "" %>> Catering
+        </label>
+
+        <label>
+          <input type="checkbox" name="bar_service" id="bar_service" <%= fn.bar_service ? "checked" : "" %>> Bar Service
+        </label>
+
+        <label>Bar Type
+          <select name="bar_type" id="bar_type">
+            <option value="">--</option>
+            <option value="cash" <%= fn.bar_type === "cash" ? "selected" : "" %>>Cash</option>
+            <option value="tab"  <%= fn.bar_type === "tab"  ? "selected" : "" %>>Tab</option>
+            <option value="host" <%= fn.bar_type === "host" ? "selected" : "" %>>Host</option>
+          </select>
+        </label>
+
+        <label>Tab Amount
+          <input type="number" step="0.01" min="0" name="bar_tab_amount" id="bar_tab_amount" value="<%= fn.bar_tab_amount || '' %>">
+        </label>
+      </div>
+
+      <label>Bar Notes
+        <textarea name="bar_notes"><%= fn.bar_notes || "" %></textarea>
+      </label>
+
+      <label>General Notes
+        <textarea name="notes"><%= fn.notes || "" %></textarea>
+      </label>
+    </div>
+
+    <!-- Services -->
+    <div class="section">
+      <h3>Services</h3>
+      <table id="servicesTable">
+        <tr>
+          <th>Service</th><th>Qty</th><th>Price</th><th>Notes</th><th>Delete</th>
+        </tr>
+        <% services.forEach(svc => { %>
+          <tr>
+            <td>
+              <select name="services[<%= svc.id %>][service_name]" onchange="updateServiceFields(this)">
+                <option value="">-- Select Service --</option>
+                <% allServices.forEach(s => { %>
+                  <option value="<%= s.name %>"
+                          data-price="<%= s.price %>"
+                          data-notes="<%= s.notes %>"
+                          <%= svc.service_name === s.name ? "selected" : "" %>>
+                    <%= s.name %> - $<%= s.price %>
+                  </option>
+                <% }) %>
+              </select>
+            </td>
+            <td><input type="number" min="0" step="1" name="services[<%= svc.id %>][qty]" value="<%= svc.qty %>"></td>
+            <td><input type="number" step="0.01" min="0" name="services[<%= svc.id %>][price]" value="<%= svc.price %>"></td>
+            <td><input type="text" name="services[<%= svc.id %>][notes]" value="<%= svc.notes || '' %>"></td>
+            <td><input type="checkbox" name="delete_services[]" value="<%= svc.id %>"></td>
+          </tr>
+        <% }) %>
+        <% const newSvcId = `new_${Date.now()}`; %>
+        <tr>
+          <td>
+            <select name="services[<%= newSvcId %>][service_name]" onchange="updateServiceFields(this)">
+              <option value="">-- Select Service --</option>
+              <% allServices.forEach(s => { %>
+                <option value="<%= s.name %>" data-price="<%= s.price %>" data-notes="<%= s.notes %>">
+                  <%= s.name %> - $<%= s.price %>
+                </option>
+              <% }) %>
+            </select>
+          </td>
+          <td><input type="number" min="0" step="1" name="services[<%= newSvcId %>][qty]" value="1"></td>
+          <td><input type="number" step="0.01" min="0" name="services[<%= newSvcId %>][price]"></td>
+          <td><input type="text" name="services[<%= newSvcId %>][notes]"></td>
+          <td></td>
+        </tr>
+      </table>
+      <button type="button" class="btn" onclick="addService()">➕ Add Another Service</button>
+    </div>
+
+    <!-- Menus -->
+    <div class="section">
+      <h3>Menus</h3>
+      <table id="menusTable">
+        <tr>
+          <th>Menu</th><th>Qty</th><th>Price</th><th>Notes</th><th>Delete</th>
+        </tr>
+        <% menus.forEach(m => { %>
+          <tr>
+            <td><%= m.name %></td>
+            <td><input type="number" min="0" step="1" name="menus[<%= m.menu_id %>][qty]" value="<%= m.qty %>"></td>
+            <td><input type="number" step="0.01" min="0" name="menus[<%= m.menu_id %>][price]" value="<%= m.price %>"></td>
+            <td><input type="text" name="menus[<%= m.menu_id %>][notes]" value="<%= m.notes || '' %>"></td>
+            <td><input type="checkbox" name="delete_menus[]" value="<%= m.menu_id %>"></td>
+          </tr>
+        <% }) %>
+        <% const newMenuId = `new_${Date.now()}`; %>
+        <tr>
+          <td>
+            <select name="menus[<%= newMenuId %>][menu_id]" onchange="updateMenuFields(this)">
+              <option value="">-- Select Menu --</option>
+              <% allMenus.forEach(m => { %>
+                <option value="<%= m.id %>" data-price="<%= m.price %>" data-notes="<%= m.notes %>" data-serves="<%= m.serves %>">
+                  <%= m.name %> - $<%= m.price %> (Serves <%= m.serves %>)
+                </option>
+              <% }) %>
+            </select>
+          </td>
+          <td><input type="number" min="0" step="1" name="menus[<%= newMenuId %>][qty]" value="1"></td>
+          <td><input type="number" step="0.01" min="0" name="menus[<%= newMenuId %>][price]"></td>
+          <td><input type="text" name="menus[<%= newMenuId %>][notes]"></td>
+          <td></td>
+        </tr>
+      </table>
+      <button type="button" class="btn" onclick="addMenu()">➕ Add Another Menu</button>
+    </div>
+
+    <div class="toolbar">
+      <button type="submit" id="saveBtn" class="btn primary">💾 Save Changes</button>
+      <button type="button" id="quickConfirm" class="btn accent">Mark Confirmed</button>
+      <button type="button" id="quickCancel" class="btn danger">Cancel Enquiry</button>
+      <a href="/staff/functions/<%= fn.id %>/detail" class="btn">Discard</a>
+      <span class="muted" id="saveHint"></span>
+    </div>
+  </form>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // --- Bar field toggles ---
+    const barService = document.getElementById('bar_service');
+    const barType = document.getElementById('bar_type');
+    const barTab = document.getElementById('bar_tab_amount');
+    function toggleBarFields() {
+      const on = barService && barService.checked;
+      if (barType) barType.disabled = !on;
+      if (barTab)  barTab.disabled  = !on || (barType && barType.value !== 'tab');
+    }
+    if (barService) barService.addEventListener('change', toggleBarFields);
+    if (barType) barType.addEventListener('change', toggleBarFields);
+    toggleBarFields();
+
+    // --- Autofill helpers ---
+    function updateServiceFields(select) {
+      const row = select.closest('tr');
+      const selected = select.options[select.selectedIndex];
+      if (!selected) return;
+      const price = selected.getAttribute('data-price');
+      const notes = selected.getAttribute('data-notes');
+      const priceInput = row.querySelector("input[name*='[price]']");
+      const notesInput = row.querySelector("input[name*='[notes]']");
+      if (price && priceInput && !priceInput.value) priceInput.value = price;
+      if (notes && notesInput && !notesInput.value) notesInput.value = notes;
+    }
+    function updateMenuFields(select) {
+      const row = select.closest('tr');
+      const selected = select.options[select.selectedIndex];
+      if (!selected) return;
+      const price = selected.getAttribute('data-price');
+      const notes = selected.getAttribute('data-notes');
+      const priceInput = row.querySelector("input[name*='[price]']");
+      const notesInput = row.querySelector("input[name*='[notes]']");
+      if (price && priceInput && !priceInput.value) priceInput.value = price;
+      if (notes && notesInput && !notesInput.value) notesInput.value = notes;
+    }
+
+    function addService() {
+      const table = document.getElementById('servicesTable');
+      const row = table.insertRow();
+      const idx = 'new_' + Date.now();
+      row.innerHTML = `
+        <td>
+          <select name="services[${idx}][service_name]" onchange="updateServiceFields(this)">
+            <option value="">-- Select Service --</option>
+            <% allServices.forEach(s => { %>
+              <option value="<%= s.name %>" data-price="<%= s.price %>" data-notes="<%= s.notes %>">
+                <%= s.name %> - $<%= s.price %>
+              </option>
+            <% }) %>
+          </select>
+        </td>
+        <td><input type="number" min="0" step="1" name="services[${idx}][qty]" value="1"></td>
+        <td><input type="number" step="0.01" min="0" name="services[${idx}][price]"></td>
+        <td><input type="text" name="services[${idx}][notes]"></td>
+        <td><button type="button" class="btn danger" onclick="this.closest('tr').remove()">❌</button></td>
+      `;
+    }
+    function addMenu() {
+      const table = document.getElementById('menusTable');
+      const row = table.insertRow();
+      const idx = 'new_' + Date.now();
+      row.innerHTML = `
+        <td>
+          <select name="menus[${idx}][menu_id]" onchange="updateMenuFields(this)">
+            <option value="">-- Select Menu --</option>
+            <% allMenus.forEach(m => { %>
+              <option value="<%= m.id %>" data-price="<%= m.price %>" data-notes="<%= m.notes %>" data-serves="<%= m.serves %>">
+                <%= m.name %> - $<%= m.price %> (Serves <%= m.serves %>)
+              </option>
+            <% }) %>
+          </select>
+        </td>
+        <td><input type="number" min="0" step="1" name="menus[${idx}][qty]" value="1"></td>
+        <td><input type="number" step="0.01" min="0" name="menus[${idx}][price]"></td>
+        <td><input type="text" name="menus[${idx}][notes]"></td>
+        <td><button type="button" class="btn danger" onclick="this.closest('tr').remove()">❌</button></td>
+      `;
+    }
+
+    // --- Submit via fetch() ---
+    const form = document.getElementById('editForm');
+    const toast = document.getElementById('toast');
+    const saveBtn = document.getElementById('saveBtn');
+    const saveHint = document.getElementById('saveHint');
+    const statusSelect = document.getElementById('status');
+
+    function showToast(msg, isError=false) {
+      toast.textContent = msg;
+      toast.className = 'toast' + (isError ? ' error' : '');
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 3000);
+    }
+
+    function parseKeyFromName(name, prefix) {
+      const re = new RegExp('^' + prefix.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&') + '\\[(.+?)\\]');
+      const m = name.match(re);
+      return m ? m[1] : null;
+    }
+
+    function collectCore() {
+      const data = new FormData(form);
+      const val = k => data.get(k);
+      const has = k => data.has(k);
+      return {
+        status: val('status') || 'pending',
+        event_name: val('event_name'),
+        room: val('room'),
+        attendees: val('attendees') ? Number(val('attendees')) : null,
+        catering: has('catering'),
+        bar_service: has('bar_service'),
+        bar_type: val('bar_type') || null,
+        bar_tab_amount: val('bar_tab_amount') ? Number(val('bar_tab_amount')) : null,
+        bar_notes: val('bar_notes') || null,
+        notes: val('notes') || null,
+        event_date: val('event_date') || null,
+        event_time: val('event_time') || null
+      };
+    }
+
+    function collectServiceChanges() {
+      const table = document.getElementById('servicesTable');
+      const rows = Array.from(table.querySelectorAll('tr')).slice(1);
+      const dels = new Set(Array.from(form.querySelectorAll("input[name='delete_services[]']:checked")).map(cb => cb.value));
+      const updates = [], creates = [];
+      rows.forEach(tr => {
+        const select = tr.querySelector("select[name^='services[']");
+        const qtyInp = tr.querySelector("input[name*='[qty]']");
+        const priceInp = tr.querySelector("input[name*='[price]']");
+        const notesInp = tr.querySelector("input[name*='[notes]']");
+        if (!select) return;
+        const key = parseKeyFromName(select.name, 'services');
+        const service_name = select.value || null;
+        const qty = qtyInp && qtyInp.value !== '' ? Number(qtyInp.value) : null;
+        const price = priceInp && priceInp.value !== '' ? Number(priceInp.value) : null;
+        const notes = notesInp && notesInp.value ? notesInp.value : null;
+        if (!key) return;
+        if (/^\d+$/.test(key)) {
+          if (dels.has(key)) updates.push({ __delete: true, id: key });
+          else updates.push({ id: key, service_name, qty, price, notes });
+        } else {
+          if (service_name) creates.push({ service_name, qty, price, notes });
+        }
+      });
+      return { updates, creates };
+    }
+
+    function collectMenuChanges() {
+      const table = document.getElementById('menusTable');
+      const rows = Array.from(table.querySelectorAll('tr')).slice(1);
+      const delIds = new Set(Array.from(form.querySelectorAll("input[name='delete_menus[]']:checked")).map(cb => cb.value));
+      const updates = [], creates = [], deletes = [];
+      rows.forEach(tr => {
+        const newSelect = tr.querySelector("select[name^='menus[new_']");
+        if (newSelect) {
+          const menu_id = newSelect.value ? Number(newSelect.value) : null;
+          if (!menu_id) return;
+          const qtyInp = tr.querySelector("input[name*='[qty]']");
+          const priceInp = tr.querySelector("input[name*='[price]']");
+          const notesInp = tr.querySelector("input[name*='[notes]']");
+          const qty = qtyInp && qtyInp.value !== '' ? Number(qtyInp.value) : null;
+          const price = priceInp && priceInp.value !== '' ? Number(priceInp.value) : null;
+          const notes = notesInp && notesInp.value ? notesInp.value : null;
+          creates.push({ menu_id, qty, price, notes });
+          return;
+        }
+        const anyInput = tr.querySelector("input[name^='menus[']");
+        if (!anyInput) return;
+        const key = parseKeyFromName(anyInput.name, 'menus');
+        if (!key) return;
+        const menuId = Number(key);
+        if (delIds.has(String(menuId))) { deletes.push(menuId); return; }
+        const qtyInp = tr.querySelector("input[name*='[qty]']");
+        const priceInp = tr.querySelector("input[name*='[price]']");
+        const notesInp = tr.querySelector("input[name*='[notes]']");
+        const qty = qtyInp && qtyInp.value !== '' ? Number(qtyInp.value) : null;
+        const price = priceInp && priceInp.value !== '' ? Number(priceInp.value) : null;
+        const notes = notesInp && notesInp.value ? notesInp.value : null;
+        updates.push({ menu_id: menuId, qty, price, notes });
+      });
+      return { updates, creates, deletes };
+    }
+
+    // Quick buttons to set status then save
+    document.getElementById('quickConfirm').addEventListener('click', () => {
+      statusSelect.value = 'confirmed';
+      form.requestSubmit();
+    });
+    document.getElementById('quickCancel').addEventListener('click', () => {
+      statusSelect.value = 'cancelled';
+      form.requestSubmit();
+    });
+
+    // Submit (transactional)
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = form.dataset.id;
+      const chosenStatus = (new FormData(form).get('status') || 'pending').toLowerCase();
+      saveBtn.disabled = true;
+      saveHint.textContent = 'Saving…';
+
+      try {
+        const svc = collectServiceChanges();
+        const payload = {
+          core: collectCore(),
+          services: {
+            updates: svc.updates.filter(x => !x.__delete),
+            creates: svc.creates,
+            deletes: svc.updates.filter(x => x.__delete).map(x => x.id)
+          },
+          menus: collectMenuChanges()
+        };
+
+        const res = await fetch(`/api/functions/${id}/save-all`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || err.error || 'Save failed');
+        }
+
+        showToast('Saved successfully');
+        // Redirect rule:
+        // - Confirmed → Functions page (confirmed-only list)
+        // - Pending/Cancelled → Enquiries page
+        setTimeout(() => {
+          if (chosenStatus === 'confirmed') {
+            window.location.href = '/staff/functions';
+          } else {
+            window.location.href = '/staff/bookings';
+          }
+        }, 350);
+      } catch (err) {
+        console.error(err);
+        showToast(err.message || 'Save failed', true);
+      } finally {
+        saveBtn.disabled = false;
+        saveHint.textContent = '';
+      }
+    });
+  </script>
+</body>
+</html>

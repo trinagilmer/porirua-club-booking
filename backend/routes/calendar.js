@@ -1,36 +1,35 @@
-/// routes/calendar.js
-const express = require("express");
+// backend/routes/calendar.js
+const express = require('express');
 const router = express.Router();
-const { format, startOfWeek, endOfWeek } = require("date-fns");
-const { getEventsBetween, generateDaysArray } = require("../models/events");
+const { format, startOfWeek, endOfWeek } = require('date-fns');
+const { getEventsBetween, generateDaysArray } = require('../models/events');
 
-// Weekly calendar route
-router.get("/weekly", async (req, res) => {
-  let startParam = req.query.start;
-  let nav = req.query.nav;
+// GET /api/calendar/weekly  → JSON
+router.get('/weekly', async (req, res) => {
+  try {
+    const startParam = req.query.start;
+    const nav = req.query.nav;
 
-  // Default to today if no start given
-  let startDate = startParam ? new Date(startParam) : new Date();
+    let startDate = startParam ? new Date(startParam) : new Date();
+    if (nav === 'prev') startDate.setDate(startDate.getDate() - 7);
+    if (nav === 'next') startDate.setDate(startDate.getDate() + 7);
 
-  // Navigation
-  if (nav === "prev") startDate.setDate(startDate.getDate() - 7);
-  if (nav === "next") startDate.setDate(startDate.getDate() + 7);
+    const weekStart = startOfWeek(startDate, { weekStartsOn: 1 });
+    const weekEnd   = endOfWeek(startDate,   { weekStartsOn: 1 });
 
-  // Week boundaries (Monday → Sunday)
-  let weekStart = startOfWeek(startDate, { weekStartsOn: 1 });
-  let weekEnd = endOfWeek(startDate, { weekStartsOn: 1 });
+    const events = await getEventsBetween(weekStart, weekEnd);
+    const days   = generateDaysArray(weekStart, weekEnd);
 
-  // Query DB (or dummy data for now)
-  let events = await getEventsBetween(weekStart, weekEnd);
-  let days = generateDaysArray(weekStart, weekEnd);
-
-  // Render weekly calendar view
-  res.render("weeklyCalendar", {
-    start: format(weekStart, "yyyy-MM-dd"),
-    end: format(weekEnd, "yyyy-MM-dd"),
-    days,
-    events
-  });
+    return res.json({
+      start: format(weekStart, 'yyyy-MM-dd'),
+      end:   format(weekEnd,   'yyyy-MM-dd'),
+      days,
+      events
+    });
+  } catch (err) {
+    console.error('Calendar weekly API error:', err);
+    return res.status(500).json({ error: 'Failed to load weekly calendar' });
+  }
 });
 
 module.exports = router;

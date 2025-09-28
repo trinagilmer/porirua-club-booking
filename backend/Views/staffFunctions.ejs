@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <html><link rel="stylesheet" href="/css/main.css">
+  <title>Staff – Functions</title>
+</head>
+<body>
+  <h1>Upcoming Functions</h1>
+  <table border="1" cellpadding="6">
+    <tr>
+      <th>Event Name</th>
+      <th>Room</th>
+      <th>Attendees</th>
+      <th>Date</th>
+      <th>Time</th>
+    </tr>
+    <% functions.forEach(f => { %>
+      <tr>
+        <td><%= f.event_name %></td>
+        <td><%= f.room %></td>
+        <td><%= f.attendees %></td>
+        <td><%= f.event_date ? f.event_date.toISOString().slice(0,10) : '' %></td>
+        <td><%= f.event_time ? f.event_time.toString().slice(0,5) : '' %></td>
+      </tr>
+    <% }) %>
+  </table>
+</body>
+</html>
+

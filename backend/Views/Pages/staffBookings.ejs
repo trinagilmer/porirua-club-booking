@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Function Enquiries</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body class="pc-theme">
+  <header class="pc-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;">
+    <div>
+      <h1>Function Enquiries</h1>
+      <p class="page-lead muted">Review, confirm or cancel incoming requests.</p>
+    </div>
+    <nav class="navbar">
+      <a href="/staff/functions" class="chip">Functions</a>
+    </nav>
+  </header>
+
+  <div class="toolbar">
+    <input id="search" type="search" placeholder="Search name / email / phone…" />
+    <select id="statusFilter">
+      <option value="">All statuses</option>
+      <option value="pending">Pending</option>
+      <option value="cancelled">Cancelled</option>
+    </select>
+    <select id="timeFilter">
+      <option value="">All dates</option>
+      <option value="upcoming">Upcoming</option>
+      <option value="past">Past</option>
+    </select>
+    <button class="btn" id="exportCsv">Export CSV (visible)</button>
+  </div>
+
+  <!-- KPI cards -->
+  <section class="pc-kpis" id="stats"></section>
+
+  <table class="pc-table" id="tbl">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Name / Contact</th>
+        <th>Type</th>
+        <th>Guests</th>
+        <th>Date/Time</th>
+        <th>Status</th>
+        <th class="muted">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% (bookings || []).forEach(b => { 
+           const s = (b.status || 'pending').toLowerCase();
+           if (s === 'confirmed') { return; } // confirmed items belong on Functions page
+      %>
+        <tr
+          data-id="<%= b.id %>"
+          data-name="<%= (b.name||'').toLowerCase() %>"
+          data-email="<%= (b.email||'').toLowerCase() %>"
+          data-phone="<%= (b.phone||'').toLowerCase() %>"
+          data-status="<%= s %>"
+          data-datetime="<%= b.datetime ? new Date(b.datetime).toISOString() : '' %>"
+        >
+          <td><%= b.id %></td>
+          <td>
+            <div><strong><%= b.name %></strong></div>
+            <div class="muted"><%= b.email %> · <%= b.phone %></div>
+          </td>
+          <td><%= b.type %></td>
+          <td><%= b.guests ?? '' %></td>
+          <td>
+            <% if (b.datetime) { %>
+              <%= new Date(b.datetime).toLocaleString('en-NZ', {
+                timeZone: 'Pacific/Auckland',
+                dateStyle: 'medium',
+                timeStyle: 'short'
+              }) %>
+            <% } else { %>
+              <span class="muted">—</span>
+            <% } %>
+          </td>
+          <td>
+            <span class="pill <%= s %>"><%= s %></span>
+          </td>
+          <td>
+            <div class="actions" style="display:flex;gap:6px;">
+              <a class="btn" href="/staff/functions/<%= b.id %>/detail">View</a>
+              <% if (s !== 'confirmed') { %>
+                <button class="btn primary" data-act="confirm">Confirm</button>
+              <% } %>
+              <% if (s !== 'cancelled') { %>
+                <button class="btn danger" data-act="cancel">Cancel</button>
+              <% } %>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+    <tfoot>
+      <tr><td colspan="7"><span id="count"></span> shown</td></tr>
+    </tfoot>
+  </table>
+
+  <script>
+    const rows = Array.from(document.querySelectorAll('#tbl tbody tr'));
+    const search = document.getElementById('search');
+    const statusFilter = document.getElementById('statusFilter');
+    const timeFilter = document.getElementById('timeFilter');
+    const count = document.getElementById('count');
+    const statsBox = document.getElementById('stats');
+
+    function recompute() {
+      const q = (search.value || '').trim().toLowerCase();
+      const status = (statusFilter.value || '').toLowerCase();
+      const tf = (timeFilter.value || '');
+      const now = new Date();
+
+      let visible = 0;
+      let stats = { pending:0, cancelled:0 };
+
+      rows.forEach(tr => {
+        const name = tr.dataset.name, email = tr.dataset.email, phone = tr.dataset.phone;
+        const st = (tr.dataset.status || 'pending').toLowerCase();
+        const dtIso = tr.dataset.datetime;
+
+        // Never show confirmed items on this page
+        if (st === 'confirmed') { tr.style.display = 'none'; return; }
+
+        const matchesText = !q || (name.includes(q) || email.includes(q) || phone.includes(q));
+        const matchesStatus = !status || st === status;
+
+        let matchesTime = true;
+        if (tf) {
+          const when = dtIso ? new Date(dtIso) : null;
+          if (tf === 'upcoming') matchesTime = !when || when >= now;  // include unscheduled
+          if (tf === 'past')     matchesTime = when && when < now;
+        }
+
+        const show = matchesText && matchesStatus && matchesTime;
+        tr.style.display = show ? '' : 'none';
+        if (show) {
+          visible++;
+          if (st in stats) stats[st] = (stats[st] || 0) + 1;
+        }
+      });
+
+      count.textContent = visible;
+
+      // KPI cards (pending requests + cancelled)
+      statsBox.innerHTML = `
+        <div class="kpi-card">
+          <div class="kpi-label">Requests</div>
+          <div class="kpi-value">${stats.pending || 0}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Cancelled</div>
+          <div class="kpi-value">${stats.cancelled || 0}</div>
+        </div>
+      `;
+    }
+
+    search.addEventListener('input', recompute);
+    statusFilter.addEventListener('change', recompute);
+    timeFilter.addEventListener('change', recompute);
+    recompute();
+
+    // Inline actions (Confirm / Cancel) → PATCH API
+    document.querySelector('#tbl').addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-act]');
+      if (!btn) return;
+      const tr = btn.closest('tr');
+      const id = tr.dataset.id;
+      const act = btn.dataset.act;  // "confirm" | "cancel"
+      const newStatus = act === 'confirm' ? 'confirmed' : 'cancelled';
+
+      try {
+        const res = await fetch(`/api/functions/${id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus })
+        });
+        if (!res.ok) throw new Error('Failed to update');
+
+        // reflect in UI
+        tr.dataset.status = newStatus;
+        const pill = tr.querySelector('.pill');
+        pill.className = 'pill ' + newStatus;
+        pill.textContent = newStatus;
+
+        if (newStatus === 'confirmed') {
+          // move off this page immediately
+          tr.remove();
+        } else {
+          // toggles after cancellation
+          const confirmBtn = tr.querySelector('button[data-act="confirm"]');
+          const cancelBtn  = tr.querySelector('button[data-act="cancel"]');
+          if (confirmBtn) confirmBtn.style.display = '';
+          if (cancelBtn)  cancelBtn.style.display  = 'none';
+        }
+
+        // refresh counts/visibility
+        recompute();
+      } catch (err) {
+        alert('Update failed: ' + err.message);
+      }
+    });
+
+    // Export visible rows to CSV
+    document.getElementById('exportCsv').addEventListener('click', () => {
+      const head = ['ID','Name','Email','Phone','Type','Guests','DateTime','Status'];
+      const visibleRows = Array.from(document.querySelectorAll('#tbl tbody tr'))
+        .filter(tr => tr.style.display !== 'none');
+      const lines = visibleRows.map(tr => {
+        const tds = tr.querySelectorAll('td');
+        const vals = [
+          tds[0].innerText,
+          tds[1].querySelector('strong')?.innerText || '',
+          (tds[1].querySelector('.muted')?.innerText || '').split(' · ')[0] || '',
+          (tds[1].querySelector('.muted')?.innerText || '').split(' · ')[1] || '',
+          tds[2].innerText, tds[3].innerText, tds[4].innerText, tds[5].innerText
+        ];
+        return vals.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
+      });
+      const csv = [head.join(','), ...lines].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'function-enquiries_visible.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+  </script>
+</body>
+</html>

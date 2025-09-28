@@ -1,0 +1,31 @@
+<div class="monthly-cal">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0;">
+    <h2 style="margin:0;">Monthly — <%= monthLabel %></h2>
+    <div>
+      <a href="/staff/calendar/monthly?month=<%= prevMonth %>">◀ <%= prevMonth %></a>
+      <a href="/staff/calendar/monthly?month=<%= nextMonth %>" style="margin-left:8px;"><%= nextMonth %> ▶</a>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;">
+    <% (days || []).forEach(d => { 
+         const list = (events && events[d.dateKey]) || []; %>
+      <div style="border:1px solid #ddd;min-height:110px;padding:8px;<%= d.isOtherMonth ? 'background:#fafafa;' : '' %><%= d.isToday ? 'outline:2px solid #f59e0b;' : '' %>">
+        <div style="font-weight:600;margin-bottom:6px;"><%= d.dateStr %></div>
+        <% if (!list.length) { %>
+          <div style="color:#6b7280;">—</div>
+        <% } else { %>
+          <ul style="margin:0;padding-left:16px;">
+            <% list.forEach(ev => { %>
+              <li>
+                <strong><%= ev.event_name %></strong>
+                <% if (ev.room) { %> — <%= ev.room %><% } %>
+                <% if (ev.attendees) { %> · <%= ev.attendees %> pax<% } %>
+              </li>
+            <% }) %>
+          </ul>
+        <% } %>
+      </div>
+    <% }) %>
+  </div>
+</div>

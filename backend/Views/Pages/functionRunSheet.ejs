@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <html><link rel="stylesheet" href="/css/main.css">
+  <meta charset="utf-8" />
+  <title>Run Sheet – <%= fn.event_name %></title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 24px; }
+    .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+    .toolbar .btn { padding:8px 12px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; cursor:pointer; }
+    .card { border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin:12px 0; }
+    h1 { margin:0 0 6px 0; }
+    h2 { margin:0 0 8px 0; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; vertical-align:top; }
+    .muted { color:#6b7280; }
+    /* Hide controls on print */
+    @media print { .toolbar { display:none !important; } }
+  </style>
+</head>
+<body>
+  <!-- Always show header with name + date/time -->
+  <div class="card">
+    <h1><%= fn.event_name %></h1>
+    <div class="muted"><%= dateStr %> <%= timeStr ? ('· ' + timeStr) : '' %></div>
+  </div>
+
+  <!-- Selection toolbar -->
+  <div class="toolbar" id="controls">
+    <label><input type="checkbox" class="sec" data-sec="details" <%= showDetails ? 'checked' : '' %>> Details</label>
+    <label><input type="checkbox" class="sec" data-sec="services" <%= showServices ? 'checked' : '' %>> Services</label>
+    <label><input type="checkbox" class="sec" data-sec="bar" <%= showBar ? 'checked' : '' %>> Bar</label>
+    <label><input type="checkbox" class="sec" data-sec="menus" <%= showMenus ? 'checked' : '' %>> Menus</label>
+    <label><input type="checkbox" class="sec" data-sec="notes" <%= showNotes ? 'checked' : '' %>> Notes</label>
+    <button class="btn" id="applyBtn">Apply</button>
+    <button class="btn" onclick="window.print()">Download PDF</button>
+    <a class="btn" href="/staff/functions/<%= fn.id %>/detail">Back</a>
+  </div>
+
+  <!-- Sections -->
+  <% if (showDetails) { %>
+    <div class="card sec-details">
+      <h2>Details</h2>
+      <div><strong>Room:</strong> <%= fn.room || '' %></div>
+      <div><strong>Attendees:</strong> <%= fn.attendees ?? '' %></div>
+      <div><strong>Contact:</strong> <%= fn.contact_name || '' %> <%= fn.contact_phone ? ('· ' + fn.contact_phone) : '' %> <%= fn.contact_email ? ('· ' + fn.contact_email) : '' %></div>
+    </div>
+  <% } %>
+
+  <% if (showServices) { %>
+    <div class="card sec-services">
+      <h2>Services</h2>
+      <% if ((services||[]).length === 0) { %>
+        <div class="muted">No services.</div>
+      <% } else { %>
+        <table>
+          <thead><tr><th>Service</th><th>Qty</th><th>Price</th><th>Notes</th></tr></thead>
+          <tbody>
+            <% services.forEach(s => { %>
+              <tr>
+                <td><%= s.service_name %></td>
+                <td><%= s.qty %></td>
+                <td><%= s.price != null ? ('$' + Number(s.price).toFixed(2)) : '' %></td>
+                <td><%= s.notes || '' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+  <% } %>
+
+  <% if (showBar) { %>
+    <div class="card sec-bar">
+      <h2>Bar</h2>
+      <div><strong>Service:</strong> <%= fn.bar_service ? 'Yes' : 'No' %></div>
+      <div><strong>Type:</strong> <%= fn.bar_type || '—' %></div>
+      <% if (fn.bar_type === 'tab') { %>
+        <div><strong>Tab Amount:</strong> $<%= Number(fn.bar_tab_amount||0).toFixed(2) %></div>
+      <% } %>
+      <div><strong>Notes:</strong> <%= fn.bar_notes || '—' %></div>
+    </div>
+  <% } %>
+
+  <% if (showMenus) { %>
+    <div class="card sec-menus">
+      <h2>Menus</h2>
+      <% if ((menus||[]).length === 0) { %>
+        <div class="muted">No menus.</div>
+      <% } else { %>
+        <table>
+          <thead><tr><th>Menu</th><th>Qty</th><th>Price</th><th>Notes</th></tr></thead>
+          <tbody>
+            <% menus.forEach(m => { %>
+              <tr>
+                <td><%= m.name %></td>
+                <td><%= m.qty %></td>
+                <td>$<%= Number(m.price||0).toFixed(2) %></td>
+                <td><%= m.notes || '' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+  <% } %>
+
+  <% if (showNotes) { %>
+    <div class="card sec-notes">
+      <h2>Notes</h2>
+      <div><%= fn.notes || '<span class="muted">None</span>' %></div>
+    </div>
+  <% } %>
+
+  <script>
+    // Build sections query from checkboxes and reload
+    document.getElementById('applyBtn').addEventListener('click', () => {
+      const boxes = Array.from(document.querySelectorAll('.sec'));
+      const on = boxes.filter(b => b.checked).map(b => b.dataset.sec);
+      const base = location.pathname; // /staff/functions/:id/run-sheet
+      const q = on.length ? ('?sections=' + encodeURIComponent(on.join(','))) : '?all=1';
+      location.href = base + q;
+    });
+  </script>
+</body>
+</html>

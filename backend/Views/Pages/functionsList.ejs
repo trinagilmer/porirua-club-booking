@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('../partials/head') %>
+  <meta charset="UTF-8" />
+  <title>Functions</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    body{margin:24px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+    .toolbar input,.toolbar select,.toolbar button{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+    .actions{display:flex;gap:6px;flex-wrap:wrap}
+    .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;cursor:pointer;text-decoration:none}
+    .btn.primary{border-color:#93c5fd;color:#1d4ed8}
+    .btn.danger{border-color:#fecaca;color:#b91c1c}
+    .btn.success{border-color:#bbf7d0;color:#166534}
+    tfoot td{padding:12px;color:var(--muted);font-size:.9rem}
+  </style>
+</head>
+<body class="pc-theme">
+  <%- include('../partials/header', { active: 'functions' }) %>
+
+  <header class="pc-page-header">
+    <div>
+      <h1>Functions</h1>
+      <p class="page-lead muted">Showing confirmed functions only.</p>
+    </div>
+    <nav class="navbar">
+      <a href="/dashboard" class="chip">Dashboard</a>
+      <a href="/staff/bookings" class="chip">Enquiries</a>
+    </nav>
+  </header>
+
+  <div class="toolbar">
+    <input id="q" type="search" placeholder="Search event / contact / room…" />
+    <select id="when">
+      <option value="">All dates</option>
+      <option value="upcoming">Upcoming</option>
+      <option value="past">Past</option>
+      <option value="unscheduled">Unscheduled</option>
+    </select>
+    <button class="btn" id="exportCsv">Export CSV (visible)</button>
+  </div>
+
+  <table id="tbl" class="pc-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Event</th>
+        <th>Room</th>
+        <th>Att.</th>
+        <th>Status</th>
+        <th>Total</th>
+        <th class="muted">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% (functions || []).forEach(f => {
+           const status = (f.status || 'confirmed').toLowerCase();
+           if (status !== 'confirmed') return; // ONLY CONFIRMED on this page
+           const daySource = f.nz_day || f.event_date || null;
+           const nzDay = daySource ? new Date(daySource) : null;
+           const dateStr = nzDay ? nzDay.toLocaleDateString('en-NZ') : '—';
+           const keyForFilter = [
+             (f.event_name||''),
+             (f.room||''),
+             (f.contact_name||''),
+             (f.contact_phone||'')
+           ].join(' ').toLowerCase();
+      %>
+        <tr
+          data-id="<%= f.id %>"
+          data-key="<%= keyForFilter %>"
+          data-status="confirmed"
+          data-date="<%= nzDay ? nzDay.toISOString() : '' %>"
+        >
+          <td><%= dateStr %></td>
+          <td>
+            <div><strong><%= f.event_name %></strong></div>
+            <% if (f.contact_name || f.contact_phone) { %>
+              <div class="muted"><%= f.contact_name || '' %><%= f.contact_phone ? ' · ' + f.contact_phone : '' %></div>
+            <% } %>
+          </td>
+          <td><%= f.room || '' %></td>
+          <td><%= f.attendees ?? '' %></td>
+          <td><span class="pill confirmed">confirmed</span></td>
+          <td>$<%= Number(f.total_value || 0).toFixed(2) %></td>
+          <td>
+            <div class="actions">
+              <a class="btn" href="/staff/functions/<%= f.id %>/detail" target="_blank">View</a>
+              <a class="btn primary" href="/api/functions/<%= f.id %>/edit">Edit</a>
+              <a class="btn" href="/api/functions/<%= f.id %>/run-sheet?format=csv" target="_blank">Run Sheet (CSV)</a>
+              <button class="btn danger" data-act="cancel">Cancel</button>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+    <tfoot>
+      <tr><td colspan="7"><span id="count"></span> shown</td></tr>
+    </tfoot>
+  </table>
+
+  <script>
+    const startOfToday = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
+
+    const rows = Array.from(document.querySelectorAll('#tbl tbody tr'));
+    const q = document.getElementById('q');
+    const when = document.getElementById('when');
+    const count = document.getElementById('count');
+
+    function recompute() {
+      const term = (q.value || '').trim().toLowerCase();
+      const whenVal = when.value;
+      const today = startOfToday();
+
+      let visible = 0;
+      rows.forEach(tr => {
+        const txt = tr.dataset.key || '';
+        const dtIso = tr.dataset.date || '';
+        const hasDate = !!dtIso;
+        const dt = hasDate ? new Date(dtIso) : null;
+
+        let ok = true;
+        if (term) ok = txt.includes(term);
+
+        if (ok && whenVal) {
+          if (whenVal === 'upcoming')         ok = hasDate && dt >= today;
+          else if (whenVal === 'past')        ok = hasDate && dt <  today;
+          else if (whenVal === 'unscheduled') ok = !hasDate;
+        }
+
+        tr.style.display = ok ? '' : 'none';
+        if (ok) visible++;
+      });
+
+      if (count) count.textContent = visible;
+    }
+
+    q.addEventListener('input', recompute);
+    when.addEventListener('change', recompute);
+    recompute();
+
+    // Inline Cancel -> move off this page (set status=cancelled, then hide)
+    document.querySelector('#tbl').addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-act="cancel"]');
+      if (!btn) return;
+      const tr = btn.closest('tr');
+      const id = tr.dataset.id;
+
+      try {
+        const res = await fetch(`/api/functions/${id}/status`, {
+          method:'PATCH',
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify({ status: 'cancelled' })
+        });
+        if (!res.ok) throw new Error('Update failed');
+
+        // Hide immediately (since cancelled items belong on Enquiries)
+        tr.remove();
+        recompute();
+      } catch (err) {
+        alert(err.message || 'Update failed');
+      }
+    });
+
+    // Export visible to CSV
+    document.getElementById('exportCsv').addEventListener('click', () => {
+      const head = ['Date','Event','Room','Attendees','Status','Total'];
+      const visible = Array.from(document.querySelectorAll('#tbl tbody tr'))
+        .filter(tr => tr.style.display !== 'none');
+      const lines = visible.map(tr => {
+        const tds = tr.querySelectorAll('td');
+        const vals = [
+          tds[0].innerText,
+          tds[1].querySelector('strong')?.innerText || '',
+          tds[2].innerText,
+          tds[3].innerText,
+          tds[4].innerText,
+          tds[5].innerText
+        ];
+        return vals.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
+      });
+      const csv = [head.join(','), ...lines].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'functions_visible.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+  </script>
+</body>
+</html>

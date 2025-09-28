@@ -1,0 +1,34 @@
+<div class="section">
+  <h3>Bar Service</h3>
+
+  <label for="bar_type">Bar Type:</label>
+  <select name="bar_type" id="bar_type" onchange="toggleTabAmount()">
+    <option value="">-- Select --</option>
+    <option value="cash" <%= event && event.bar_type === "cash" ? "selected" : "" %>>Cash Bar</option>
+    <option value="hosted" <%= event && event.bar_type === "hosted" ? "selected" : "" %>>Hosted Bar</option>
+    <option value="tab" <%= event && event.bar_type === "tab" ? "selected" : "" %>>Bar Tab</option>
+  </select>
+
+  <div id="tab_amount_field" style="margin-top:10px; display: <%= event && event.bar_type === "tab" ? "block" : "none" %>;">
+    <label for="bar_tab_amount">Tab Amount:</label>
+    <input type="number" name="bar_tab_amount" id="bar_tab_amount" step="0.01" 
+           value="<%= event ? event.bar_tab_amount : '' %>">
+  </div>
+
+  <div style="margin-top:10px;">
+    <label for="bar_notes">Notes:</label>
+    <textarea name="bar_notes" id="bar_notes" rows="3" cols="40"><%= event ? event.bar_notes : "" %></textarea>
+  </div>
+</div>
+
+<script>
+function toggleTabAmount() {
+  const barType = document.getElementById("bar_type").value;
+  const tabField = document.getElementById("tab_amount_field");
+  if (barType === "tab") {
+    tabField.style.display = "block";
+  } else {
+    tabField.style.display = "none";
+  }
+}
+</script>

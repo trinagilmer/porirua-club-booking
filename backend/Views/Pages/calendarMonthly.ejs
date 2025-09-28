@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="/css/main.css">
+
+  <meta charset="utf-8" />
+  <title>Staff — Monthly Calendar</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 20px; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .nav a { margin-left: 8px; }
+
+    .grid { display:grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 12px; }
+    .cell { border:1px solid #ddd; min-height: 120px; padding:8px; background:#fff; }
+    .head { font-weight:600; margin-bottom: 6px; }
+    .muted { color:#6b7280; font-size:.9rem; }
+    .other { background:#fafafa; }
+    .today { outline:2px solid #f59e0b; }
+    ul { margin:0; padding-left: 16px; }
+
+    /* Legend + badges + greyed bookings */
+    .legend { margin: 6px 0; color:#6b7280; font-size:.9rem; }
+    .i { padding:2px 6px; border-radius:10px; font-size:.75rem; border:1px solid #e5e7eb; }
+    .i.fn { background:#eef2ff; color:#3730a3; border-color:#c7d2fe; } /* Function */
+    .i.bk { background:#f3f4f6; color:#374151; border-color:#e5e7eb; } /* Booking */
+    .ev.bk { color:#6b7280; } /* grey text for bookings */
+
+    /* optional: subtle conflict highlight if both exist */
+    .cell.has-both { box-shadow: inset 0 0 0 2px #fde68a; } /* amber ring */
+  </style>
+</head>
+<body>
+  <%- include('../partials/header', { active: 'calendar' }) %>
+  <header>
+    <h1>Monthly Calendar — <%= monthLabel %></h1>
+    <div class="nav">
+      <a href="/staff/calendar/monthly?month=<%= prevMonth %>">◀ <%= prevMonth %></a>
+      <a href="/staff/calendar/monthly?month=<%= nextMonth %>"><%= nextMonth %> ▶</a>
+    </div>
+  </header>
+
+  <div class="legend">
+    <span class="i fn">Function</span>
+    <span class="i bk">Booking</span>
+  </div>
+
+  <div class="grid">
+    <% (days || []).forEach(d => { 
+         const list = (events && events[d.dateKey]) || [];
+         const hasFn = list.some(x => x.evtype === 'function');
+         const hasBk = list.some(x => x.evtype === 'booking');
+         const cellCls = [
+           d.isOtherMonth ? 'other' : '',
+           d.isToday ? 'today' : '',
+           (hasFn && hasBk) ? 'has-both' : ''
+         ].filter(Boolean).join(' ');
+    %>
+      <div class="cell <%= cellCls %>">
+        <div class="head"><%= d.dateStr %></div>
+
+        <% if (!list.length) { %>
+          <div class="muted">—</div>
+        <% } else { %>
+          <ul>
+            <% list.forEach(ev => { %>
+              <% if (ev.evtype === 'booking') { %>
+                <!-- Greyed-out booking -->
+                <li class="ev bk">
+                  <span class="i bk">Booking</span>
+                  <strong><%= ev.name %></strong>
+                  <% if (ev.type) { %> · <%= ev.type %><% } %>
+                  <% if (ev.guests) { %> · <%= ev.guests %> pax<% } %>
+                  <% if (ev.status) { %> · <%= ev.status %><% } %>
+                </li>
+              <% } else { %>
+                <!-- Function -->
+                <li class="ev fn">
+                  <span class="i fn">Function</span>
+                  <strong><%= ev.event_name %></strong>
+                  <% if (ev.room) { %> — <%= ev.room %><% } %>
+                  <% if (ev.attendees) { %> · <%= ev.attendees %> pax<% } %>
+                </li>
+              <% } %>
+            <% }) %>
+          </ul>
+        <% } %>
+      </div>
+    <% }) %>
+  </div>
+</body>
+</html>
+
+
+

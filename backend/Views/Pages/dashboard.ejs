@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <%- include('../partials/head') %>
+  <meta charset="utf-8" />
+  <title>Dashboard</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 24px; background:#fafafa; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; }
+    .muted { color:#6b7280; }
+    .cards { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap:12px; }
+    .card { border:1px solid #e5e7eb; border-radius:12px; padding:16px; background:#fff; }
+    .kpis { display:grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap:12px; }
+    .kpi { border:1px dashed #e5e7eb; border-radius:10px; padding:12px; background:#fff; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    input, select, button { padding:8px 10px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; }
+    button.primary { border-color:#93c5fd; color:#1d4ed8; cursor:pointer; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
+    .pill { padding:2px 8px; border-radius:999px; font-size:.8rem; }
+    .pill.confirmed { background:#DCFCE7; color:#065F46; }
+    .pill.pending { background:#FEF3C7; color:#92400E; }
+    .pill.lead { background:#EDE9FE; color:#5B21B6; }
+    .done { text-decoration: line-through; color:#6b7280; }
+    .two-col { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    @media (max-width: 920px) { .two-col { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <%- include('../partials/header', { active: 'dashboard' }) %>
+  <header>
+    <div>
+      <h1 style="margin:0;">Dashboard</h1>
+      <div class="muted">Welcome<% if (user && user.name) { %>, <strong><%= user.name %></strong><% } %> — NZ time.</div>
+    </div>
+    <form class="row" method="GET" action="/dashboard">
+      <label>Start <input type="date" name="start" value="<%= start %>" /></label>
+      <label>End <input type="date" name="end" value="<%= end %>" /></label>
+      <button class="primary" type="submit">Apply</button>
+    </form>
+  </header>
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="muted">Confirmed Functions (period)</div>
+      <div style="font-size:1.6rem;"><%= kpi.confirmed_count || 0 %></div>
+    </div>
+    <div class="kpi">
+      <div class="muted">Confirmed Value (period)</div>
+      <div style="font-size:1.6rem;">$<%= Number(kpi.confirmed_value || 0).toFixed(2) %></div>
+    </div>
+    <div class="kpi">
+      <div class="muted">Pending</div>
+      <div style="font-size:1.6rem;"><%= kpi.pending_count || 0 %></div>
+    </div>
+    <div class="kpi">
+      <div class="muted">Leads</div>
+      <div style="font-size:1.6rem;"><%= kpi.lead_count || 0 %></div>
+    </div>
+  </div>
+
+  <div class="two-col" style="margin-top:16px;">
+    <div class="card">
+      <h3>Quick Links</h3>
+      <div class="row">
+        <a href="/staff/calendar/weekly">Weekly Calendar</a>
+        <a href="/staff/calendar/monthly">Monthly Calendar</a>
+        <a href="/staff/functions">Functions</a>
+        <a href="/staff/bookings" class="chip">Enquiries</a>
+        <a href="/staff/catalog">Menus & Services</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Quick Add — Menu Item</h3>
+      <form id="menuForm" class="row" onsubmit="return addMenu(event);">
+        <input name="name" placeholder="Name" required />
+        <input name="price" type="number" step="0.01" placeholder="Price" required />
+        <input name="serves" type="number" placeholder="Serves" required />
+        <input name="notes" placeholder="Notes (optional)" />
+        <button class="primary">Add</button>
+      </form>
+      <div id="menuMsg" class="muted"></div>
+    </div>
+  </div>
+
+  <div class="two-col" style="margin-top:12px;">
+    <div class="card">
+      <h3>Quick Add — Service</h3>
+      <form id="svcForm" class="row" onsubmit="return addService(event);">
+        <input name="name" placeholder="Service name" required />
+        <input name="price" type="number" step="0.01" placeholder="Price (optional)" />
+        <input name="notes" placeholder="Notes (optional)" />
+        <button class="primary">Add</button>
+      </form>
+      <div id="svcMsg" class="muted"></div>
+    </div>
+
+    <div class="card">
+      <h3>Open Tasks</h3>
+      <% if ((tasks || []).length === 0) { %>
+        <div class="muted">No open tasks</div>
+      <% } else { %>
+        <table>
+          <thead><tr><th></th><th>Task</th><th>Due</th><th>Assignee</th></tr></thead>
+          <tbody>
+            <% tasks.forEach(t => { %>
+              <tr data-id="<%= t.id %>">
+                <td><input type="checkbox" onclick="toggleTask(<%= t.id %>, this)" /></td>
+                <td><%= t.title %></td>
+                <td><%= t.due_date ? new Date(t.due_date).toLocaleDateString('en-NZ') : '' %></td>
+                <td><%= t.assignee || '' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+      <form id="taskForm" class="row" style="margin-top:8px;" onsubmit="return addTask(event);">
+        <input name="title" placeholder="New task…" required />
+        <input name="due_date" type="date" />
+        <button class="primary">Add Task</button>
+      </form>
+      <div id="taskMsg" class="muted"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px;">
+    <h3>Upcoming (in period)</h3>
+    <% if ((upcoming || []).length === 0) { %>
+      <div class="muted">No events in this period.</div>
+    <% } else { %>
+      <table>
+        <thead><tr><th>Date</th><th>Event</th><th>Room</th><th>Att.</th><th>Status</th><th>Total</th><th></th></tr></thead>
+        <tbody>
+          <% upcoming.forEach(f => { %>
+            <tr>
+              <td><%= f.d_date ? new Date(f.d_date).toLocaleDateString('en-NZ') : '' %></td>
+              <td><strong><%= f.event_name %></strong></td>
+              <td><%= f.room || '' %></td>
+              <td><%= f.attendees || '' %></td>
+              <td>
+                <span class="pill <%= f.status %>"><%= f.status %></span>
+              </td>
+              <td>$<%= Number(f.total_value || 0).toFixed(2) %></td>
+              <td><a href="/api/functions/<%= f.id %>/edit">Edit</a></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
+
+  <script>
+    async function addMenu(e) {
+      e.preventDefault();
+      const f = e.target;
+      const body = {
+        name: f.name.value.trim(),
+        price: Number(f.price.value || 0),
+        serves: Number(f.serves.value || 1),
+        notes: f.notes.value.trim() || null
+      };
+      const r = await fetch('/api/catalog/menus', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+      });
+      document.getElementById('menuMsg').textContent = r.ok ? 'Menu item added.' : 'Failed to add.';
+      if (r.ok) f.reset();
+      return false;
+    }
+
+    async function addService(e) {
+      e.preventDefault();
+      const f = e.target;
+      const body = {
+        name: f.name.value.trim(),
+        price: f.price.value ? Number(f.price.value) : null,
+        notes: f.notes.value.trim() || null
+      };
+      const r = await fetch('/api/catalog/services', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+      });
+      document.getElementById('svcMsg').textContent = r.ok ? 'Service added.' : 'Failed to add.';
+      if (r.ok) f.reset();
+      return false;
+    }
+
+    async function addTask(e) {
+      e.preventDefault();
+      const f = e.target;
+      const body = {
+        title: f.title.value.trim(),
+        due_date: f.due_date.value || null
+      };
+      const r = await fetch('/api/tasks', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+      });
+      document.getElementById('taskMsg').textContent = r.ok ? 'Task added.' : 'Failed to add.';
+      if (r.ok) location.reload();
+      return false;
+    }
+
+    async function toggleTask(id, cb) {
+      cb.disabled = true;
+      const r = await fetch('/api/tasks/' + id, {
+        method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status: 'done' })
+      });
+      if (r.ok) cb.closest('tr').classList.add('done');
+      cb.disabled = false;
+    }
+  </script>
+</body>
+</html>
