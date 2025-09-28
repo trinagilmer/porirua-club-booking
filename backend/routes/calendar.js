@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { format, startOfWeek, endOfWeek } = require('date-fns');
-const { getEventsBetween, generateDaysArray } = require('../models/events');
+const { getEventsBetween, generateDaysArray } = require('../Models/events');
 
 // GET /api/calendar/weekly  → JSON
 router.get('/weekly', async (req, res) => {
