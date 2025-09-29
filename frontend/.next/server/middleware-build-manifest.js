@@ -19,7 +19,7 @@ globalThis.__BUILD_MANIFEST = {
     "static/chunks/_a0ff3932._.js",
     "static/chunks/turbopack-_cdba956c._.js"
   ],
-  "ampFirstpages": []
+  "ampFirstPages": []
 };
 globalThis.__BUILD_MANIFEST.lowPriorityFiles = [
 "/static/" + process.env.__NEXT_BUILD_ID + "/_buildManifest.js",

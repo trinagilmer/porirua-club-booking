@@ -57,7 +57,7 @@ ORDER BY COALESCE(function_datetime, booking_datetime) ASC NULLS LAST,
 
 
     // Render your existing EJS (capitalised path matches app.js)
-    res.render('pages/staffBookings', {
+    res.render('Pages/staffBookings', {
       bookings: rows,
       user: req.session.user
     });

@@ -165,7 +165,7 @@ router.get('/dashboard', async (req, res) => {
       tasks = []; // no tasks table yet; ignore
     }
 
-    return res.render('pages/dashboard', {
+    return res.render('Pages/dashboard', {
       user: req.session.user,
       start: startStr,
       end: endStr,
