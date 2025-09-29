@@ -726,7 +726,7 @@ router.get('/:id/edit', async (req, res) => {
       [id]
     );
 
-    // Render EJS (ensure views path is Uppercase: "views/Pages/functions/edit.ejs")
+    // Render EJS (ensure views path is Uppercase: "Views/Pages/functions/edit.ejs")
     return res.render('Pages/functions/edit', {
       fn: fnRows[0],
       services: svcRows,
