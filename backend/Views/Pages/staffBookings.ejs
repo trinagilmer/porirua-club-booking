@@ -32,7 +32,6 @@
     <button class="btn" id="exportCsv">Export CSV (visible)</button>
   </div>
 
-  <!-- KPI cards -->
   <section class="pc-kpis" id="stats"></section>
 
   <table class="pc-table" id="tbl">
@@ -49,27 +48,34 @@
     </thead>
     <tbody>
       <% (bookings || []).forEach(b => { 
-           const s = (b.status || 'pending').toLowerCase();
-           if (s === 'confirmed') { return; } // confirmed items belong on Functions page
+           const stage = b.stage || (b.function_id ? 'function' : 'enquiry');
+           const status = (stage === 'function'
+             ? (b.function_status || 'pending')
+             : (b.booking_status  || 'pending')
+           ).toLowerCase();
+           const when = b.function_datetime || b.booking_datetime || null;
+           const idLabel = stage === 'function' ? `F-${b.function_id}` : `B-${(b.booking_id || b.id)}`;
       %>
         <tr
-          data-id="<%= b.id %>"
+          data-stage="<%= stage %>"
+          data-booking-id="<%= b.booking_id || b.id %>"
+          data-function-id="<%= b.function_id || '' %>"
           data-name="<%= (b.name||'').toLowerCase() %>"
           data-email="<%= (b.email||'').toLowerCase() %>"
           data-phone="<%= (b.phone||'').toLowerCase() %>"
-          data-status="<%= s %>"
-          data-datetime="<%= b.datetime ? new Date(b.datetime).toISOString() : '' %>"
+          data-status="<%= status %>"
+          data-datetime="<%= when ? new Date(when).toISOString() : '' %>"
         >
-          <td><%= b.id %></td>
+          <td><%= idLabel %></td>
           <td>
             <div><strong><%= b.name %></strong></div>
-            <div class="muted"><%= b.email %> · <%= b.phone %></div>
+            <div class="muted"><%= b.email || '—' %> · <%= b.phone || '—' %></div>
           </td>
-          <td><%= b.type %></td>
+          <td><%= b.type || 'function' %></td>
           <td><%= b.guests ?? '' %></td>
           <td>
-            <% if (b.datetime) { %>
-              <%= new Date(b.datetime).toLocaleString('en-NZ', {
+            <% if (when) { %>
+              <%= new Date(when).toLocaleString('en-NZ', {
                 timeZone: 'Pacific/Auckland',
                 dateStyle: 'medium',
                 timeStyle: 'short'
@@ -79,16 +85,23 @@
             <% } %>
           </td>
           <td>
-            <span class="pill <%= s %>"><%= s %></span>
+            <span class="pill <%= status %>"><%= status %></span>
           </td>
           <td>
             <div class="actions" style="display:flex;gap:6px;">
-              <a class="btn" href="/staff/functions/<%= b.id %>/detail">View</a>
-              <% if (s !== 'confirmed') { %>
-                <button class="btn primary" data-act="confirm">Confirm</button>
-              <% } %>
-              <% if (s !== 'cancelled') { %>
-                <button class="btn danger" data-act="cancel">Cancel</button>
+              <% if (stage === 'function') { %>
+                <a class="btn" href="/staff/functions/<%= b.function_id %>/detail">View</a>
+                <% if (status !== 'confirmed') { %>
+                  <button class="btn primary" data-act="confirm">Confirm</button>
+                <% } %>
+                <% if (status !== 'cancelled') { %>
+                  <button class="btn danger" data-act="cancel">Cancel</button>
+                <% } %>
+              <% } else { %> <!-- enquiry -->
+                <a class="btn primary" href="/staff/functions/new?bookingId=<%= b.booking_id || b.id %>">Create</a>
+                <% if (status !== 'cancelled') { %>
+                  <button class="btn danger" data-act="cancel-enquiry">Cancel</button>
+                <% } %>
               <% } %>
             </div>
           </td>
@@ -122,9 +135,6 @@
         const st = (tr.dataset.status || 'pending').toLowerCase();
         const dtIso = tr.dataset.datetime;
 
-        // Never show confirmed items on this page
-        if (st === 'confirmed') { tr.style.display = 'none'; return; }
-
         const matchesText = !q || (name.includes(q) || email.includes(q) || phone.includes(q));
         const matchesStatus = !status || st === status;
 
@@ -144,8 +154,6 @@
       });
 
       count.textContent = visible;
-
-      // KPI cards (pending requests + cancelled)
       statsBox.innerHTML = `
         <div class="kpi-card">
           <div class="kpi-label">Requests</div>
@@ -163,55 +171,61 @@
     timeFilter.addEventListener('change', recompute);
     recompute();
 
-    // Inline actions (Confirm / Cancel) → PATCH API
+    // Actions
     document.querySelector('#tbl').addEventListener('click', async (e) => {
       const btn = e.target.closest('button[data-act]');
       if (!btn) return;
+
       const tr = btn.closest('tr');
-      const id = tr.dataset.id;
-      const act = btn.dataset.act;  // "confirm" | "cancel"
-      const newStatus = act === 'confirm' ? 'confirmed' : 'cancelled';
+      const stage = tr.dataset.stage; // 'function' | 'enquiry'
+      const pill = tr.querySelector('.pill');
 
       try {
-        const res = await fetch(`/api/functions/${id}/status`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: newStatus })
-        });
-        if (!res.ok) throw new Error('Failed to update');
-
-        // reflect in UI
-        tr.dataset.status = newStatus;
-        const pill = tr.querySelector('.pill');
-        pill.className = 'pill ' + newStatus;
-        pill.textContent = newStatus;
-
-        if (newStatus === 'confirmed') {
-          // move off this page immediately
-          tr.remove();
-        } else {
-          // toggles after cancellation
-          const confirmBtn = tr.querySelector('button[data-act="confirm"]');
-          const cancelBtn  = tr.querySelector('button[data-act="cancel"]');
-          if (confirmBtn) confirmBtn.style.display = '';
-          if (cancelBtn)  cancelBtn.style.display  = 'none';
+        if (btn.dataset.act === 'confirm' && stage === 'function') {
+          const fnId = tr.dataset.functionId;
+          const r = await fetch(`/api/functions/${fnId}/status`, {
+            method: 'PATCH', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ status: 'confirmed' })
+          });
+          if (!r.ok) throw new Error('Confirm failed');
+          tr.remove(); // confirmed moves off the enquiries page
+        } else if (btn.dataset.act === 'cancel' && stage === 'function') {
+          const fnId = tr.dataset.functionId;
+          const r = await fetch(`/api/functions/${fnId}/status`, {
+            method: 'PATCH', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ status: 'cancelled' })
+          });
+          if (!r.ok) throw new Error('Cancel failed');
+          tr.dataset.status = 'cancelled';
+          pill.className = 'pill cancelled';
+          pill.textContent = 'cancelled';
+        } else if (btn.dataset.act === 'cancel-enquiry' && stage === 'enquiry') {
+          const bkId = tr.dataset.bookingId;
+          const r = await fetch(`/api/bookings/${bkId}/status`, {
+            method: 'PATCH', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ status: 'cancelled' })
+          });
+          if (!r.ok) throw new Error('Cancel failed');
+          tr.dataset.status = 'cancelled';
+          pill.className = 'pill cancelled';
+          pill.textContent = 'cancelled';
         }
-
-        // refresh counts/visibility
-        recompute();
       } catch (err) {
-        alert('Update failed: ' + err.message);
+        alert(err.message);
       }
+
+      recompute();
     });
 
     // Export visible rows to CSV
     document.getElementById('exportCsv').addEventListener('click', () => {
-      const head = ['ID','Name','Email','Phone','Type','Guests','DateTime','Status'];
+      const head = ['Stage','ID','Name','Email','Phone','Type','Guests','DateTime','Status'];
       const visibleRows = Array.from(document.querySelectorAll('#tbl tbody tr'))
         .filter(tr => tr.style.display !== 'none');
       const lines = visibleRows.map(tr => {
         const tds = tr.querySelectorAll('td');
         const vals = [
+          tr.dataset.stage.toUpperCase(),
           tds[0].innerText,
           tds[1].querySelector('strong')?.innerText || '',
           (tds[1].querySelector('.muted')?.innerText || '').split(' · ')[0] || '',

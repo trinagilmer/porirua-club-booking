@@ -655,15 +655,38 @@ router.patch('/:id/status', async (req, res) => {
 
 /**
  * POST /api/functions/:id/confirm  → sets status=confirmed
- * POST /api/functions/:id/cancel   → sets status=cancelled
  */
 router.post('/:id/confirm', async (req, res) => {
-  req.body.status = 'confirmed';
-  return router.handle({ ...req, method: 'PATCH', url: `/${req.params.id}/status` }, res);
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query(
+      `UPDATE functions SET status='confirmed' WHERE id=$1 RETURNING id, status`,
+      [id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Function not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Confirm function error:', err);
+    res.status(500).json({ error: 'Failed to confirm function' });
+  }
 });
+
+/**
+ * POST /api/functions/:id/cancel   → sets status=cancelled
+ */
 router.post('/:id/cancel', async (req, res) => {
-  req.body.status = 'cancelled';
-  return router.handle({ ...req, method: 'PATCH', url: `/${req.params.id}/status` }, res);
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query(
+      `UPDATE functions SET status='cancelled' WHERE id=$1 RETURNING id, status`,
+      [id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Function not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Cancel function error:', err);
+    res.status(500).json({ error: 'Failed to cancel function' });
+  }
 });
 
 /* ============================================================================

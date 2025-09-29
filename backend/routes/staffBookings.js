@@ -2,26 +2,63 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 
-// Staff bookings list page
+/**
+ * GET /staff/bookings
+ * Shows a unified list:
+ *  - stage='function'  → rows from functions (status IN pending,cancelled)
+ *  - stage='enquiry'   → bookings.type='function' with no function yet (status IN pending,cancelled)
+ * Ordered by the best available datetime.
+ */
 router.get('/', async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT b.*, f.id AS function_id
-         FROM bookings b
-         LEFT JOIN functions f ON f.booking_id = b.id
-       ORDER BY b.datetime ASC NULLS LAST, b.id ASC`
-    );
+    const { rows } = await pool.query(`
+      WITH fn AS (
+        SELECT
+          'function' AS stage,
+          f.id        AS function_id,
+          f.status    AS function_status,
+          (f.event_date::timestamp + COALESCE(f.event_time,'00:00'::time)) AS function_datetime,
+          b.id        AS booking_id,
+          b.status    AS booking_status,
+          b.datetime  AS booking_datetime,
+          b.name, b.email, b.phone, b.type, b.guests
+        FROM functions f
+        LEFT JOIN bookings b ON b.id = f.booking_id
+        WHERE f.status IN ('pending','cancelled')
+      ),
+      enqu AS (
+        SELECT
+          'enquiry' AS stage,
+          NULL      AS function_id,
+          NULL      AS function_status,
+          NULL      AS function_datetime,
+          b.id      AS booking_id,
+          b.status  AS booking_status,
+          b.datetime AS booking_datetime,
+          b.name, b.email, b.phone, b.type, b.guests
+        FROM bookings b
+        WHERE b.type = 'function'
+          AND b.status IN ('pending','cancelled')
+          AND NOT EXISTS (SELECT 1 FROM functions f WHERE f.booking_id = b.id)
+      )
+      SELECT * FROM fn
+      UNION ALL
+      SELECT * FROM enqu
+      ORDER BY COALESCE(function_datetime, booking_datetime) ASC NULLS LAST,
+               booking_id ASC;
+    `);
 
-    // Render the richer page: views/Pages/staffBookings.ejs
+    // Render your existing EJS (capitalised path matches app.js)
     res.render('Pages/staffBookings', {
-      bookings: result.rows,
+      bookings: rows,
       user: req.session.user
     });
   } catch (err) {
-    console.error('Error fetching staff bookings:', err.message);
+    console.error('Error fetching staff bookings:', err);
     res.status(500).send('Failed to load bookings');
   }
 });
 
 module.exports = router;
+
 
