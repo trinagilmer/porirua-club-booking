@@ -98,8 +98,12 @@ if (taskRoutes)    app.use('/api/tasks',   requireLogin, taskRoutes);
 // ---- Health ----
 app.get('/health', (_req, res) => res.json({ ok: true }));
 app.get('/healthz', (_req, res) => res.json({ ok: true })); //
-app.get('/', (req, res) => res.redirect('/dashboard')); // or '/login' or '/staff/bookings'
 
+// Friendly home redirect
+app.get('/', (req, res) => {
+  if (req.session?.user) return res.redirect('/dashboard');
+  return res.redirect('/login');
+});
 // ---- 404 ----
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 
