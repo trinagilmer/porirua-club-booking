@@ -7,7 +7,7 @@ const NZ_TZ = 'Pacific/Auckland';
 
 /**
  * LIST — /staff/functions
- * Renders: views/Pages/functionsList.ejs
+ * Renders: views/pages/functionsList.ejs
  */
 router.get('/', async (req, res) => {
   try {
@@ -44,7 +44,7 @@ router.get('/', async (req, res) => {
       [NZ_TZ]
     );
 
-    return res.render('Pages/functionsList', {
+    return res.render('pages/functionsList', {
       functions: rows,
       user: req.session.user || null
     });
@@ -134,7 +134,7 @@ router.get('/:id/detail', async (req, res) => {
       }
     } catch (_) { /* fall back to defaults */ }
 
-    return res.render('Pages/functionDetail', {
+    return res.render('pages/functionDetail', {
       user: req.session.user || null,
       fn,
       menus,
@@ -152,7 +152,7 @@ router.get('/:id/detail', async (req, res) => {
 
 /**
  * EDIT — /staff/functions/:id/edit
- * Renders: views/Pages/editFunction.ejs
+ * Renders: views/pages/editFunction.ejs
  * (The page’s JS posts to /api/functions/:id/save-all — that’s handled by your API routes.)
  */
 router.get('/:id/edit', async (req, res) => {
@@ -251,7 +251,7 @@ router.get('/:id/edit', async (req, res) => {
       rooms = [{ name: 'Main Hall' }, { name: 'Lounge' }, { name: 'Conference Room' }];
     }
 
-    return res.render('Pages/editFunction', {
+    return res.render('pages/editFunction', {
       fn,
       menus,
       services,
