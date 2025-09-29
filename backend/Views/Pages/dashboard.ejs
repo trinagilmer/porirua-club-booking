@@ -124,25 +124,45 @@
     </div>
   </div>
 
-  <div class="card" style="margin-top:12px;">
+    <div class="card" style="margin-top:12px;">
     <h3>Upcoming (in period)</h3>
     <% if ((upcoming || []).length === 0) { %>
       <div class="muted">No events in this period.</div>
     <% } else { %>
       <table>
-        <thead><tr><th>Date</th><th>Event</th><th>Room</th><th>Att.</th><th>Status</th><th>Total</th><th></th></tr></thead>
+        <thead>
+          <tr>
+            <th>Date / Time</th>
+            <th>Event</th>
+            <th>Room</th>
+            <th>Att.</th>
+            <th>Status</th>
+            <th>Total</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
         <tbody>
-          <% upcoming.forEach(f => { %>
+          <% upcoming.forEach(f => { 
+               const dt = f.starts_at || f.event_at || f.date || f.d_date || null;
+               const when = dt ? new Date(dt) : null;
+               const room = f.room || f.room_name || '';
+               const att  = f.attendees ?? f.pax ?? f.guest_count ?? '';
+               const total = Number(f.est_total ?? f.total_value ?? 0);
+            %>
             <tr>
-              <td><%= f.d_date ? new Date(f.d_date).toLocaleDateString('en-NZ') : '' %></td>
+              <td><%= when ? when.toLocaleString('en-NZ', { dateStyle:'medium', timeStyle:'short' }) : '' %></td>
               <td><strong><%= f.event_name %></strong></td>
-              <td><%= f.room || '' %></td>
-              <td><%= f.attendees || '' %></td>
-              <td>
-                <span class="pill <%= f.status %>"><%= f.status %></span>
+              <td><%= room %></td>
+              <td><%= att %></td>
+              <td><span class="pill <%= f.status %>"><%= f.status %></span></td>
+              <td>$<%= total.toFixed(2) %></td>
+              <td class="row">
+                <a class="btn" href="/api/functions/<%= f.id %>/edit">Edit</a>
+                <% if (f.status === 'pending') { %>
+                  <button class="btn" onclick="confirmFn(<%= f.id %>)">Confirm</button>
+                  <button class="btn" onclick="cancelFn(<%= f.id %>)">Cancel</button>
+                <% } %>
               </td>
-              <td>$<%= Number(f.total_value || 0).toFixed(2) %></td>
-              <td><a href="/api/functions/<%= f.id %>/edit">Edit</a></td>
             </tr>
           <% }) %>
         </tbody>
@@ -151,22 +171,17 @@
   </div>
 
   <script>
-    async function addMenu(e) {
-      e.preventDefault();
-      const f = e.target;
-      const body = {
-        name: f.name.value.trim(),
-        price: Number(f.price.value || 0),
-        serves: Number(f.serves.value || 1),
-        notes: f.notes.value.trim() || null
-      };
-      const r = await fetch('/api/catalog/menus', {
-        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
-      });
-      document.getElementById('menuMsg').textContent = r.ok ? 'Menu item added.' : 'Failed to add.';
-      if (r.ok) f.reset();
-      return false;
+    async function confirmFn(id) {
+      const r = await fetch(`/api/functions/${id}/confirm`, { method:'POST' });
+      if (r.ok) location.reload();
+      else alert('Failed to confirm');
     }
+    async function cancelFn(id) {
+      const r = await fetch(`/api/functions/${id}/cancel`, { method:'POST' });
+      if (r.ok) location.reload();
+      else alert('Failed to cancel');
+    }
+  </script>
 
     async function addService(e) {
       e.preventDefault();

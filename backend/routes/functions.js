@@ -7,7 +7,7 @@ const { format } = require('date-fns');
 const ALLOWED_STATUS = new Set(['pending','confirmed','cancelled']);
 
 /**
- * Helper: build starts_at from (event_date + event_time) with fallback to created_at
+ * Compute a sortable start datetime from event_date + event_time, fallback to created_at.
  */
 const startsAtSql = `
   COALESCE(
@@ -16,20 +16,21 @@ const startsAtSql = `
   )
 `;
 
-/* =======================================================================
-   LIST + STATS (keep these BEFORE any "/:id" routes)
-======================================================================= */
+/* ============================================================================
+   LIST + STATS  (keep BEFORE any "/:id" routes)
+============================================================================ */
 
 /**
  * GET /api/functions
- * Query params:
+ * Query:
  *   status=pending|confirmed|cancelled
- *   exclude_status=pending|confirmed|cancelled
- *   q=<search string>
+ *   exclude_status=...
+ *   q=<search>
  *   from=YYYY-MM-DD
  *   to=YYYY-MM-DD
  *   page=<n> (default 1)
  *   size=<n> (default 20, max 100)
+ * Returns rows with est_total safely aggregated (no duplicate inflation).
  */
 router.get('/', async (req, res) => {
   const { status, exclude_status, q, from, to } = req.query;
@@ -40,19 +41,14 @@ router.get('/', async (req, res) => {
   const vals = [];
   let i = 1;
 
-  // Mutually exclusive: if 'status' provided and valid, it wins.
   if (status && ALLOWED_STATUS.has(String(status).toLowerCase())) {
-    filters.push(`f.status = $${i++}`);
-    vals.push(String(status).toLowerCase());
+    filters.push(`f.status = $${i++}`); vals.push(String(status).toLowerCase());
   } else if (exclude_status && ALLOWED_STATUS.has(String(exclude_status).toLowerCase())) {
-    // exclude given status; include NULLs (legacy data) in the results
     filters.push(`(f.status IS DISTINCT FROM $${i++} OR f.status IS NULL)`);
     vals.push(String(exclude_status).toLowerCase());
   }
-
   if (from) { filters.push(`f.event_date >= $${i++}::date`); vals.push(from); }
   if (to)   { filters.push(`f.event_date <= $${i++}::date`); vals.push(to);   }
-
   if (q) {
     filters.push(`(
       f.event_name ILIKE $${i} OR
@@ -62,20 +58,34 @@ router.get('/', async (req, res) => {
     )`);
     vals.push(`%${q}%`); i++;
   }
-
   const whereSql = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
   const offset = (page - 1) * size;
 
   try {
     const listSql = `
+      WITH svc AS (
+        SELECT function_id, SUM(COALESCE(price,0) * COALESCE(qty,1)) AS total_services
+        FROM services
+        GROUP BY function_id
+      ),
+      mn AS (
+        SELECT fm.function_id,
+               SUM(COALESCE(fm.price, m.price, 0) * COALESCE(fm.qty,1)) AS total_menus
+        FROM function_menus fm
+        JOIN menus m ON m.id = fm.menu_id
+        GROUP BY fm.function_id
+      )
       SELECT
         f.id, f.event_name, f.event_date, f.event_time, f.status,
         ${startsAtSql} AS starts_at,
-        b.name AS contact_name, b.phone AS contact_phone, b.email AS contact_email
+        b.name AS contact_name, b.phone AS contact_phone, b.email AS contact_email,
+        COALESCE(svc.total_services,0) + COALESCE(mn.total_menus,0) AS est_total
       FROM functions f
       LEFT JOIN bookings b ON b.id = f.booking_id
+      LEFT JOIN svc ON svc.function_id = f.id
+      LEFT JOIN mn  ON mn.function_id  = f.id
       ${whereSql}
-      ORDER BY ${startsAtSql} DESC NULLS LAST, f.id DESC
+      ORDER BY ${startsAtSql} ASC NULLS LAST, f.id ASC
       LIMIT $${i++} OFFSET $${i++}
     `;
     const countSql = `
@@ -87,13 +97,13 @@ router.get('/', async (req, res) => {
 
     const [listRes, countRes] = await Promise.all([
       pool.query(listSql, [...vals, size, offset]),
-      pool.query(countSql, vals)
+      pool.query(countSql, vals),
     ]);
 
     const total = Number(countRes.rows[0]?.total || 0);
     res.json({ page, size, total, rows: listRes.rows });
   } catch (err) {
-    console.error('list error:', err.message);
+    console.error('list error:', err);
     res.status(500).json({ error: 'Failed to load functions' });
   }
 });
@@ -117,23 +127,37 @@ router.get('/stats', async (_req, res) => {
     const cancelled = toIntSafe(c.cancelled);
     res.json({ pending, confirmed, cancelled, total: pending + confirmed + cancelled });
   } catch (err) {
-    console.error('stats error:', err.message);
+    console.error('stats error:', err);
     res.status(500).json({ error: 'Failed to load stats' });
   }
 });
 
-/* =======================================================================
+/* ============================================================================
    DETAIL
-======================================================================= */
+============================================================================ */
 
 /**
- * GET /api/functions/:id  → detail (JSON, with services & menus)
+ * GET /api/functions/:id  → detail JSON (includes services, menus, est_total)
  */
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
   try {
     const fnRes = await pool.query(
       `
+      WITH svc AS (
+        SELECT function_id, SUM(COALESCE(price,0) * COALESCE(qty,1)) AS total_services
+        FROM services
+        WHERE function_id = $1
+        GROUP BY function_id
+      ),
+      mn AS (
+        SELECT fm.function_id,
+               SUM(COALESCE(fm.price, m.price, 0) * COALESCE(fm.qty,1)) AS total_menus
+        FROM function_menus fm
+        JOIN menus m ON m.id = fm.menu_id
+        WHERE fm.function_id = $1
+        GROUP BY fm.function_id
+      )
       SELECT
         f.id, f.booking_id, f.event_name, f.room, f.attendees, f.status,
         f.catering, f.bar_service, f.bar_type, f.bar_tab_amount, f.bar_notes,
@@ -141,9 +165,12 @@ router.get('/:id', async (req, res) => {
         ${startsAtSql} AS starts_at,
         b.name  AS contact_name,
         b.phone AS contact_phone,
-        b.email AS contact_email
+        b.email AS contact_email,
+        COALESCE(svc.total_services,0) + COALESCE(mn.total_menus,0) AS est_total
       FROM functions f
       LEFT JOIN bookings b ON b.id = f.booking_id
+      LEFT JOIN svc ON svc.function_id = f.id
+      LEFT JOIN mn  ON mn.function_id  = f.id
       WHERE f.id = $1
       `,
       [id]
@@ -153,7 +180,7 @@ router.get('/:id', async (req, res) => {
 
     const services = (
       await pool.query(
-        `SELECT id, service_name, qty, price, notes
+        `SELECT id, function_id, service_name, qty, price, notes
          FROM services WHERE function_id=$1 ORDER BY id ASC`,
         [id]
       )
@@ -161,7 +188,8 @@ router.get('/:id', async (req, res) => {
 
     const menus = (
       await pool.query(
-        `SELECT m.id AS menu_id, m.name, m.price, m.serves, fm.qty, fm.notes, fm.price AS override_price
+        `SELECT m.id AS menu_id, m.name, m.price AS base_price, m.serves,
+                fm.qty, fm.notes, fm.price AS override_price
          FROM function_menus fm
          JOIN menus m ON m.id = fm.menu_id
          WHERE fm.function_id=$1
@@ -172,14 +200,14 @@ router.get('/:id', async (req, res) => {
 
     return res.json({ function: fn, services, menus });
   } catch (err) {
-    console.error('Error fetching function detail:', err.message);
+    console.error('Error fetching function detail:', err);
     return res.status(500).json({ error: 'Failed to fetch function detail' });
   }
 });
 
-/* =======================================================================
+/* ============================================================================
    UPDATE CORE
-======================================================================= */
+============================================================================ */
 
 /**
  * PATCH /api/functions/:id → update core fields (JSON)
@@ -215,10 +243,7 @@ router.patch('/:id', async (req, res) => {
     const vals = [];
     let i = 1;
     for (const [col, val] of mapping) {
-      if (val !== undefined) {
-        sets.push(`${col} = $${i++}`);
-        vals.push(val);
-      }
+      if (val !== undefined) { sets.push(`${col} = $${i++}`); vals.push(val); }
     }
 
     if (!sets.length) {
@@ -234,14 +259,14 @@ router.patch('/:id', async (req, res) => {
     if (!rows[0]) return res.status(404).json({ error: 'Function not found' });
     return res.json(rows[0]);
   } catch (err) {
-    console.error('Error updating function:', err.message);
+    console.error('Error updating function:', err);
     return res.status(500).json({ error: 'Failed to update function' });
   }
 });
 
-/* =======================================================================
+/* ============================================================================
    SERVICES
-======================================================================= */
+============================================================================ */
 
 /**
  * POST /api/functions/:id/services → add service line
@@ -260,7 +285,7 @@ router.post('/:id/services', async (req, res) => {
     );
     return res.status(201).json(rows[0]);
   } catch (err) {
-    console.error('Error adding service:', err.message);
+    console.error('Error adding service:', err);
     return res.status(500).json({ error: 'Failed to add service' });
   }
 });
@@ -277,11 +302,9 @@ router.patch('/services/:serviceId', async (req, res) => {
     const values = [];
     let i = 1;
 
-    // Only update name when it's non-empty after trim
     if (service_name !== undefined) {
       const sv = toText(service_name);
       if (sv !== null) { fields.push(`service_name=$${i++}`); values.push(sv); }
-      // if sv === null, skip updating name to avoid NOT NULL violation
     }
     if (qty   !== undefined) { fields.push(`qty=$${i++}`);   values.push(toInt(qty)); }
     if (price !== undefined) { fields.push(`price=$${i++}`); values.push(toNumericOrNull(price)); }
@@ -304,7 +327,7 @@ router.patch('/services/:serviceId', async (req, res) => {
     if (!rows[0]) return res.status(404).json({ error: 'Service not found' });
     return res.json(rows[0]);
   } catch (err) {
-    console.error('Error updating service:', err.message);
+    console.error('Error updating service:', err);
     return res.status(500).json({ error: 'Failed to update service' });
   }
 });
@@ -319,14 +342,14 @@ router.delete('/services/:serviceId', async (req, res) => {
     if (!rowCount) return res.status(404).json({ error: 'Service not found' });
     return res.status(204).end();
   } catch (err) {
-    console.error('Error deleting service:', err.message);
+    console.error('Error deleting service:', err);
     return res.status(500).json({ error: 'Failed to delete service' });
   }
 });
 
-/* =======================================================================
+/* ============================================================================
    MENUS
-======================================================================= */
+============================================================================ */
 
 /**
  * POST /api/functions/:id/menus → attach a menu to the function
@@ -341,17 +364,17 @@ router.post('/:id/menus', async (req, res) => {
       `INSERT INTO function_menus (function_id, menu_id, qty, notes${price != null ? ', price' : ''})
        VALUES ($1,$2,$3,$4${price != null ? ',$5' : ''})`,
       price != null
-        ? [id, parseInt(menu_id, 10), toInt(qty), toText(notes), toNumericOrNull(price)]
-        : [id, parseInt(menu_id, 10), toInt(qty), toText(notes)]
+        ? [id, toInt(menu_id), toInt(qty), toText(notes), toNumericOrNull(price)]
+        : [id, toInt(menu_id), toInt(qty), toText(notes)]
     );
 
     if (price != null) {
-      await pool.query(`UPDATE menus SET price=$1 WHERE id=$2`, [toNumericOrNull(price), parseInt(menu_id, 10)]);
+      await pool.query(`UPDATE menus SET price=$1 WHERE id=$2`, [toNumericOrNull(price), toInt(menu_id)]);
     }
 
     return res.status(201).json({ ok: true });
   } catch (err) {
-    console.error('Error adding function menu:', err.message);
+    console.error('Error adding function menu:', err);
     return res.status(500).json({ error: 'Failed to add function menu' });
   }
 });
@@ -373,7 +396,7 @@ router.patch('/:id/menus/:menuId', async (req, res) => {
     if (price !== undefined) { fields.push(`price=$${i++}`); values.push(toNumericOrNull(price)); }
 
     if (fields.length) {
-      values.push(id, parseInt(menuId, 10));
+      values.push(id, toInt(menuId));
       await pool.query(
         `UPDATE function_menus SET ${fields.join(', ')} WHERE function_id=$${i++} AND menu_id=$${i}`,
         values
@@ -381,19 +404,19 @@ router.patch('/:id/menus/:menuId', async (req, res) => {
     }
 
     if (price !== undefined) {
-      await pool.query(`UPDATE menus SET price=$1 WHERE id=$2`, [toNumericOrNull(price), parseInt(menuId, 10)]);
+      await pool.query(`UPDATE menus SET price=$1 WHERE id=$2`, [toNumericOrNull(price), toInt(menuId)]);
     }
 
     return res.json({ ok: true });
   } catch (err) {
-    console.error('Error updating function menu:', err.message);
+    console.error('Error updating function menu:', err);
     return res.status(500).json({ error: 'Failed to update function menu' });
   }
 });
 
-/* =======================================================================
+/* ============================================================================
    RUN SHEET
-======================================================================= */
+============================================================================ */
 
 /**
  * GET /api/functions/:id/run-sheet?format=json|csv
@@ -434,14 +457,14 @@ router.get('/:id/run-sheet', async (req, res) => {
 
     return res.json(rows);
   } catch (err) {
-    console.error('Error fetching run sheet:', err.message);
+    console.error('Error fetching run sheet:', err);
     return res.status(500).json({ error: 'Failed to fetch run sheet' });
   }
 });
 
-/* =======================================================================
-   SAVE-ALL (transactional) — SINGLE IMPLEMENTATION
-======================================================================= */
+/* ============================================================================
+   SAVE-ALL (transactional)
+============================================================================ */
 
 /**
  * POST /api/functions/:id/save-all
@@ -454,7 +477,7 @@ router.post('/:id/save-all', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // 1) Update core function fields (only those provided)
+    // 1) Update core fields
     const coreMap = {
       event_name:      toText(core.event_name),
       room:            toText(core.room),
@@ -486,7 +509,7 @@ router.post('/:id/save-all', async (req, res) => {
       if (!rowCount) throw new Error('Function not found');
     }
 
-    // 2) Services (delete → update → create)
+    // 2) Services
     const svc = {
       deletes: Array.isArray(services.deletes) ? services.deletes : [],
       updates: Array.isArray(services.updates) ? services.updates : [],
@@ -496,32 +519,27 @@ router.post('/:id/save-all', async (req, res) => {
     for (const delId of svc.deletes) {
       await client.query(`DELETE FROM services WHERE id=$1 AND function_id=$2`, [toInt(delId), id]);
     }
-
     for (const u of svc.updates) {
       if (!u || !u.id) continue;
       const fields = [];
       const values = [];
       let j = 1;
-
       if (u.service_name !== undefined) {
         const sv = toText(u.service_name);
         if (sv !== null) { fields.push(`service_name=$${j++}`); values.push(sv); }
-        // if null, skip updating service_name (keeps existing, avoids NOT NULL error)
       }
       if (u.qty   !== undefined) { fields.push(`qty=$${j++}`);   values.push(toInt(u.qty)); }
       if (u.price !== undefined) { fields.push(`price=$${j++}`); values.push(toNumericOrNull(u.price)); }
       if (u.notes !== undefined) { fields.push(`notes=$${j++}`); values.push(toText(u.notes)); }
       if (!fields.length) continue;
-
       values.push(toInt(u.id), id);
       await client.query(
         `UPDATE services SET ${fields.join(', ')} WHERE id=$${j++} AND function_id=$${j}`,
         values
       );
     }
-
     for (const c of svc.creates) {
-      if (!c || !toText(c.service_name)) continue; // require non-empty name
+      if (!c || !toText(c.service_name)) continue;
       await client.query(
         `INSERT INTO services (function_id, service_name, qty, price, notes)
          VALUES ($1,$2,$3,$4,$5)`,
@@ -529,7 +547,7 @@ router.post('/:id/save-all', async (req, res) => {
       );
     }
 
-    // 3) Menus (delete → update → create)
+    // 3) Menus
     const men = {
       deletes: Array.isArray(menus.deletes) ? menus.deletes : [],
       updates: Array.isArray(menus.updates) ? menus.updates : [],
@@ -542,7 +560,6 @@ router.post('/:id/save-all', async (req, res) => {
         [id, toInt(delMenuId)]
       );
     }
-
     for (const u of men.updates) {
       if (!u || !u.menu_id) continue;
       const fields = [];
@@ -550,7 +567,7 @@ router.post('/:id/save-all', async (req, res) => {
       let j = 1;
       if (u.qty   !== undefined) { fields.push(`qty=$${j++}`);   values.push(toInt(u.qty)); }
       if (u.notes !== undefined) { fields.push(`notes=$${j++}`); values.push(toText(u.notes)); }
-      if (u.price !== undefined) { fields.push(`price=$${j++}`); values.push(toNumericOrNull(u.price)); } // if function_menus.price exists
+      if (u.price !== undefined) { fields.push(`price=$${j++}`); values.push(toNumericOrNull(u.price)); }
       if (fields.length) {
         values.push(id, toInt(u.menu_id));
         await client.query(
@@ -562,7 +579,6 @@ router.post('/:id/save-all', async (req, res) => {
         await client.query(`UPDATE menus SET price=$1 WHERE id=$2`, [toNumericOrNull(u.price), toInt(u.menu_id)]);
       }
     }
-
     for (const c of men.creates) {
       if (!c || !c.menu_id) continue;
       await client.query(
@@ -581,7 +597,6 @@ router.post('/:id/save-all', async (req, res) => {
 
     await client.query('COMMIT');
 
-    // pull a concise view back (function + current services/menus)
     const fnRes = await pool.query(
       `SELECT f.*, ${startsAtSql} AS starts_at FROM functions f WHERE f.id=$1`,
       [id]
@@ -606,17 +621,15 @@ router.post('/:id/save-all', async (req, res) => {
       menus: menuRes.rows
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    try { await pool.query('ROLLBACK'); } catch {}
     console.error('save-all error:', err);
     return res.status(500).json({ error: 'Save failed', detail: err.message });
-  } finally {
-    client.release();
   }
 });
 
-/* =======================================================================
-   STATUS ONLY
-======================================================================= */
+/* ============================================================================
+   STATUS ONLY + helpers
+============================================================================ */
 
 /**
  * PATCH /api/functions/:id/status
@@ -635,14 +648,76 @@ router.patch('/:id/status', async (req, res) => {
     if (!rows[0]) return res.status(404).json({ error: 'Function not found' });
     res.json(rows[0]);
   } catch (err) {
-    console.error('Update function status error:', err.message);
+    console.error('Update function status error:', err);
     res.status(500).json({ error: 'Failed to update status' });
   }
 });
 
-/* =======================================================================
+/**
+ * POST /api/functions/:id/confirm  → sets status=confirmed
+ * POST /api/functions/:id/cancel   → sets status=cancelled
+ */
+router.post('/:id/confirm', async (req, res) => {
+  req.body.status = 'confirmed';
+  return router.handle({ ...req, method: 'PATCH', url: `/${req.params.id}/status` }, res);
+});
+router.post('/:id/cancel', async (req, res) => {
+  req.body.status = 'cancelled';
+  return router.handle({ ...req, method: 'PATCH', url: `/${req.params.id}/status` }, res);
+});
+
+/* ============================================================================
+   SERVER-RENDERED EDIT VIEW (for the Dashboard "Edit" button)
+   NOTE: If this router is mounted at '/api/functions', your edit URL will be
+   '/api/functions/:id/edit'. Either:
+     1) Change the Edit link to that, OR
+     2) Also mount this router at '/functions' in app.js so '/functions/:id/edit' works.
+============================================================================ */
+router.get('/:id/edit', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Load core
+    const { rows: fnRows } = await pool.query(
+      `SELECT f.*, ${startsAtSql} AS starts_at,
+              b.name AS contact_name, b.email AS contact_email, b.phone AS contact_phone
+       FROM functions f
+       LEFT JOIN bookings b ON b.id = f.booking_id
+       WHERE f.id=$1`,
+      [id]
+    );
+    if (!fnRows[0]) return res.status(404).send('Function not found');
+
+    const { rows: svcRows } = await pool.query(
+      `SELECT id, service_name, qty, price, notes
+       FROM services WHERE function_id=$1 ORDER BY id`,
+      [id]
+    );
+    const { rows: menuRows } = await pool.query(
+      `SELECT m.id AS menu_id, m.name, m.price AS base_price, m.serves,
+              fm.qty, fm.notes, fm.price AS override_price
+       FROM function_menus fm
+       JOIN menus m ON m.id = fm.menu_id
+       WHERE fm.function_id=$1
+       ORDER BY m.name`,
+      [id]
+    );
+
+    // Render EJS (ensure views path is lowercase: "views/pages/functions/edit.ejs")
+    return res.render('pages/functions/edit', {
+      fn: fnRows[0],
+      services: svcRows,
+      menus: menuRows
+    });
+  } catch (err) {
+    console.error('render edit error:', err);
+    return res.status(500).send('Failed to load edit view');
+  }
+});
+
+/* ============================================================================
    Helpers
-======================================================================= */
+============================================================================ */
 function toInt(v) {
   return v !== undefined && v !== null && !Number.isNaN(Number(v)) ? parseInt(v, 10) : null;
 }
@@ -664,11 +739,9 @@ function toDateOrNull(v) {
 }
 function toTimeOrNull(v) {
   if (!v) return null;
-  // Accept "18:00" or "18:00:00"
   const m = String(v).match(/^(\d{2}):(\d{2})(?::(\d{2}))?$/);
   if (!m) return null;
   return `${m[1]}:${m[2]}:${m[3] || '00'}`;
 }
 
 module.exports = router;
-
