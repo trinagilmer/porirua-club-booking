@@ -7,7 +7,7 @@ const NZ_TZ = 'Pacific/Auckland';
 
 /**
  * LIST — /staff/functions
- * Renders: views/Pages/functionslist.ejs
+ * Renders: views/Pages/functionsList.ejs
  */
 router.get('/', async (req, res) => {
   try {
@@ -44,7 +44,7 @@ router.get('/', async (req, res) => {
       [NZ_TZ]
     );
 
-    return res.render('Pages/functionslist', {
+    return res.render('Pages/functionsList', {
       functions: rows,
       user: req.session.user || null
     });
