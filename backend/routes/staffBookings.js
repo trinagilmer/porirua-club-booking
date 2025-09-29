@@ -12,8 +12,8 @@ router.get('/', async (req, res) => {
        ORDER BY b.datetime ASC NULLS LAST, b.id ASC`
     );
 
-    // Render the richer page: views/pages/staffBookings.ejs
-    res.render('pages/staffBookings', {
+    // Render the richer page: views/Pages/staffBookings.ejs
+    res.render('Pages/staffBookings', {
       bookings: result.rows,
       user: req.session.user
     });

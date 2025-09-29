@@ -114,7 +114,7 @@ router.get('/weekly', async (req, res) => {
       });
     }
 
-   return res.render('pages/calendarWeekly', {
+   return res.render('Pages/calendarWeekly', {
       days,
       events: eventsByDate,
       start: format(weekStart, 'yyyy-MM-dd'),
@@ -224,7 +224,7 @@ router.get('/monthly', async (req, res) => {
       });
     }
 
-    return res.render('pages/calendarMonthly', {
+    return res.render('Pages/calendarMonthly', {
       days,
       events: byDay,
       monthLabel: format(firstOfMonth, 'MMMM yyyy'),
