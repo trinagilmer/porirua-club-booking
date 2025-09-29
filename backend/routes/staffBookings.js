@@ -4,10 +4,7 @@ const pool = require('../db');
 
 /**
  * GET /staff/bookings
- * Shows a unified list:
- *  - stage='function'  → rows from functions (status IN pending,cancelled)
- *  - stage='enquiry'   → bookings.type='function' with no function yet (status IN pending,cancelled)
- * Ordered by the best available datetime.
+ * Unified list of pending/cancelled functions + enquiries (no function yet).
  */
 router.get('/', async (req, res) => {
   try {
@@ -32,18 +29,18 @@ WITH fn AS (
 ),
 enqu AS (
   SELECT
-    'enquiry'::text  AS stage,
-    NULL::int        AS function_id,
-    NULL::text       AS function_status,
+    'enquiry'::text   AS stage,
+    NULL::int         AS function_id,
+    NULL::text        AS function_status,
     NULL::timestamptz AS function_datetime,
-    b.id::int        AS booking_id,
-    b.status::text   AS booking_status,
+    b.id::int         AS booking_id,
+    b.status::text    AS booking_status,
     b.datetime::timestamptz AS booking_datetime,
-    b.name::text     AS name,
-    b.email::text    AS email,
-    b.phone::text    AS phone,
-    b.type::text     AS type,
-    b.guests::int    AS guests
+    b.name::text      AS name,
+    b.email::text     AS email,
+    b.phone::text     AS phone,
+    b.type::text      AS type,
+    b.guests::int     AS guests
   FROM bookings b
   WHERE b.type = 'function'
     AND b.status IN ('pending','cancelled')
@@ -54,7 +51,7 @@ UNION ALL
 SELECT * FROM enqu
 ORDER BY COALESCE(function_datetime, booking_datetime) ASC NULLS LAST,
          booking_id ASC;
-
+    `);
 
     // Render your existing EJS (capitalised path matches app.js)
     res.render('Pages/staffBookings', {
@@ -68,5 +65,4 @@ ORDER BY COALESCE(function_datetime, booking_datetime) ASC NULLS LAST,
 });
 
 module.exports = router;
-
 
