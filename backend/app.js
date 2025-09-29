@@ -5,6 +5,13 @@ const session = require('express-session');
 
 // Load env from backend/.env (hosted platforms use their own env panel)
 require('dotenv').config({ path: path.join(__dirname, '.env') });
+// backend/app.js
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
+// TEMP: allow self-signed certs in staging if explicitly enabled
+if (String(process.env.ALLOW_SELF_SIGNED_TLS || '').toLowerCase() === 'true') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
 
 const app = express();
 console.log('[app] booting…');
