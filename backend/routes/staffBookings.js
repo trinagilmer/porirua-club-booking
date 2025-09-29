@@ -12,41 +12,49 @@ const pool = require('../db');
 router.get('/', async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      WITH fn AS (
-        SELECT
-          'function' AS stage,
-          f.id        AS function_id,
-          f.status    AS function_status,
-          (f.event_date::timestamp + COALESCE(f.event_time,'00:00'::time)) AS function_datetime,
-          b.id        AS booking_id,
-          b.status    AS booking_status,
-          b.datetime  AS booking_datetime,
-          b.name, b.email, b.phone, b.type, b.guests
-        FROM functions f
-        LEFT JOIN bookings b ON b.id = f.booking_id
-        WHERE f.status IN ('pending','cancelled')
-      ),
-      enqu AS (
-        SELECT
-          'enquiry' AS stage,
-          NULL      AS function_id,
-          NULL      AS function_status,
-          NULL      AS function_datetime,
-          b.id      AS booking_id,
-          b.status  AS booking_status,
-          b.datetime AS booking_datetime,
-          b.name, b.email, b.phone, b.type, b.guests
-        FROM bookings b
-        WHERE b.type = 'function'
-          AND b.status IN ('pending','cancelled')
-          AND NOT EXISTS (SELECT 1 FROM functions f WHERE f.booking_id = b.id)
-      )
-      SELECT * FROM fn
-      UNION ALL
-      SELECT * FROM enqu
-      ORDER BY COALESCE(function_datetime, booking_datetime) ASC NULLS LAST,
-               booking_id ASC;
-    `);
+WITH fn AS (
+  SELECT
+    'function'::text AS stage,
+    f.id::int        AS function_id,
+    f.status::text   AS function_status,
+    (f.event_date::timestamp + COALESCE(f.event_time,'00:00'::time))::timestamptz AS function_datetime,
+    b.id::int        AS booking_id,
+    b.status::text   AS booking_status,
+    b.datetime::timestamptz AS booking_datetime,
+    b.name::text     AS name,
+    b.email::text    AS email,
+    b.phone::text    AS phone,
+    b.type::text     AS type,
+    b.guests::int    AS guests
+  FROM functions f
+  LEFT JOIN bookings b ON b.id = f.booking_id
+  WHERE f.status IN ('pending','cancelled')
+),
+enqu AS (
+  SELECT
+    'enquiry'::text  AS stage,
+    NULL::int        AS function_id,
+    NULL::text       AS function_status,
+    NULL::timestamptz AS function_datetime,
+    b.id::int        AS booking_id,
+    b.status::text   AS booking_status,
+    b.datetime::timestamptz AS booking_datetime,
+    b.name::text     AS name,
+    b.email::text    AS email,
+    b.phone::text    AS phone,
+    b.type::text     AS type,
+    b.guests::int    AS guests
+  FROM bookings b
+  WHERE b.type = 'function'
+    AND b.status IN ('pending','cancelled')
+    AND NOT EXISTS (SELECT 1 FROM functions f WHERE f.booking_id = b.id)
+)
+SELECT * FROM fn
+UNION ALL
+SELECT * FROM enqu
+ORDER BY COALESCE(function_datetime, booking_datetime) ASC NULLS LAST,
+         booking_id ASC;
+
 
     // Render your existing EJS (capitalised path matches app.js)
     res.render('Pages/staffBookings', {
