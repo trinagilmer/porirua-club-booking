@@ -29,7 +29,7 @@ router.get('/dashboard', async (req, res, next) => {
       ORDER BY f.start_at ASC, f.id ASC
     `);
 
-    res.render('pages/dashboard', { functions });
+    res.render('Pages/dashboard', { functions });
   } catch (err) {
     next(err);
   }

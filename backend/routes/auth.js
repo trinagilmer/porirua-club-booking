@@ -4,7 +4,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const pool = require('../db');
 
-// ---------- Auth pages ----------
+// ---------- Auth Pages ----------
 
 // Register form
 router.get('/register', (req, res) => {
