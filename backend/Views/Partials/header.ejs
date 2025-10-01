@@ -9,11 +9,12 @@
   </div>
 
   <nav class="navbar">
-    <a class="chip <%= active === 'dashboard' ? 'active' : '' %>" href="/dashboard">Dashboard</a>
-    <a class="chip <%= active === 'weekly' ? 'active' : '' %>" href="/staff/calendar/weekly">Weekly</a>
-    <a class="chip <%= active === 'monthly' ? 'active' : '' %>" href="/staff/calendar/monthly">Monthly</a>
-    <a class="chip <%= active === 'functions' ? 'active' : '' %>" href="/staff/functions">Functions</a>
-    <a class="chip <%= active === 'bookings' ? 'active' : '' %>" href="/staff/bookings">Bookings</a>
-    <a class="chip dark <%= active === 'catalog' ? 'active' : '' %>" href="/staff/catalog">Menus & Services</a>
+    <a class="chip <%= (active === 'dashboard') ? 'active' : '' %>" href="/dashboard">Dashboard</a>
+    <a class="chip <%= (active === 'weekly') ? 'active' : '' %>" href="/staff/calendar/weekly">Weekly</a>
+    <a class="chip <%= (active === 'monthly') ? 'active' : '' %>" href="/staff/calendar/monthly">Monthly</a>
+    <a class="chip <%= (active === 'functions') ? 'active' : '' %>" href="/staff/functions">Functions</a>
+    <a class="chip <%= (active === 'bookings') ? 'active' : '' %>" href="/staff/bookings">Bookings</a>
+    <a class="chip dark <%= (active === 'catalog') ? 'active' : '' %>" href="/staff/catalog">Menus & Services</a>
   </nav>
 </div>
+
