@@ -1,4 +1,3 @@
-// backend/routes/dashboard.js
 const express = require("express");
 const pool = require("../db");
 const { startOfMonth, subMonths, format } = require("date-fns");
@@ -6,13 +5,41 @@ const { requireLogin } = require("../Middleware/authMiddleware");
 
 const router = express.Router();
 
-// Dashboard main route
 router.get("/", requireLogin, async (req, res, next) => {
   try {
     const userId = req.session.user?.id;
 
+    // ---- Handle filters ----
+    const { from, to, quick } = req.query;
+    let fromDate = from ? new Date(from) : null;
+    let toDate = to ? new Date(to) : null;
+
+    if (quick === "week") {
+      fromDate = new Date();
+      fromDate.setDate(fromDate.getDate() - 7);
+      toDate = new Date();
+    } else if (quick === "month") {
+      fromDate = startOfMonth(new Date());
+      toDate = new Date();
+    }
+
+    // date filter SQL condition
+    let dateFilterSQL = "";
+    let params = [];
+    if (fromDate && toDate) {
+      dateFilterSQL = "AND f.event_start BETWEEN $1 AND $2";
+      params.push(fromDate, toDate);
+    } else if (fromDate) {
+      dateFilterSQL = "AND f.event_start >= $1";
+      params.push(fromDate);
+    } else if (toDate) {
+      dateFilterSQL = "AND f.event_start <= $1";
+      params.push(toDate);
+    }
+
     // ---- 1. KPIs ----
-    const { rows: kpiRows } = await pool.query(`
+    const { rows: kpiRows } = await pool.query(
+      `
       SELECT
         COALESCE(SUM(CASE WHEN status IN ('confirmed','deposit_paid','invoiced','completed')
                           THEN totals_price ELSE 0 END),0) AS confirmed_price,
@@ -21,23 +48,29 @@ router.get("/", requireLogin, async (req, res, next) => {
         COALESCE(SUM(CASE WHEN status IN ('lead','pending')
                           THEN totals_price ELSE 0 END),0) AS pipeline_price,
         COUNT(*) FILTER (WHERE status IN ('lead','pending')) AS pipeline_count
-      FROM functions
-    `);
+      FROM functions f
+      WHERE 1=1 ${dateFilterSQL}
+      `,
+      params
+    );
     const kpis = kpiRows[0];
 
-    // ---- 2. Revenue Trend (last 12 months) ----
-    const startDate = startOfMonth(subMonths(new Date(), 11));
+    // ---- 2. Revenue Trend (last 12 months or filtered) ----
+    const defaultStart = startOfMonth(subMonths(new Date(), 11));
+    const revenueStart = fromDate || defaultStart;
+
     const { rows: revenueRows } = await pool.query(
       `
       SELECT to_char(date_trunc('month', event_start), 'YYYY-MM') AS ym,
              SUM(totals_price) AS revenue
-      FROM functions
+      FROM functions f
       WHERE status IN ('confirmed','deposit_paid','invoiced','completed')
         AND event_start >= $1
+        ${toDate ? "AND event_start <= $2" : ""}
       GROUP BY ym
       ORDER BY ym ASC
       `,
-      [startDate]
+      toDate ? [revenueStart, toDate] : [revenueStart]
     );
 
     const graph = {
@@ -45,7 +78,7 @@ router.get("/", requireLogin, async (req, res, next) => {
       data: revenueRows.map(r => parseFloat(r.revenue || 0)),
     };
 
-    // ---- 3. Upcoming Functions (next 30 days) ----
+    // ---- 3. Upcoming Functions ----
     const { rows: upcoming } = await pool.query(
       `
       SELECT f.id, f.event_name, f.attendees, f.status, f.totals_price,
@@ -54,9 +87,10 @@ router.get("/", requireLogin, async (req, res, next) => {
       FROM functions f
       LEFT JOIN rooms r ON r.id = f.room_id
       WHERE f.event_start >= now()
-        AND f.event_start <= now() + interval '30 days'
+        ${dateFilterSQL ? dateFilterSQL.replace("f.", "f.") : "AND f.event_start <= now() + interval '30 days'"}
       ORDER BY f.event_start ASC
-      `
+      `,
+      params
     );
 
     upcoming.forEach(fn => {
@@ -84,7 +118,7 @@ router.get("/", requireLogin, async (req, res, next) => {
     // ---- 5. My Tasks (open) ----
     const { rows: tasks } = await pool.query(
       `
-      SELECT t.id, t.title, t.due_at, u.name AS assignee
+      SELECT t.id, t.title, t.due_at, u.name AS assignee, t.status
       FROM tasks t
       LEFT JOIN users u ON u.id = t.assigned_user_id
       WHERE t.status = 'open'
@@ -98,20 +132,21 @@ router.get("/", requireLogin, async (req, res, next) => {
     tasks.forEach(t => {
       t.due_at_str = t.due_at ? format(t.due_at, "yyyy-MM-dd") : "";
     });
-   // ---- Render view ----
-res.render("Pages/dashboard", {
-  title: "Dashboard",
-  active: "dashboard",
-  kpis,
-  graph,
-  upcoming,
-  leads,
-  tasks
-});
+
+    // ---- Render view ----
+    res.render("Pages/dashboard", {
+      title: "Dashboard",
+      active: "dashboard",
+      kpis,
+      graph,
+      upcoming,
+      leads,
+      tasks,
+      filters: { from, to }
+    });
   } catch (err) {
     next(err);
   }
 });
-
 
 module.exports = router;
