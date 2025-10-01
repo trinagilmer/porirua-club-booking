@@ -98,21 +98,16 @@ router.get("/", requireLogin, async (req, res, next) => {
     tasks.forEach(t => {
       t.due_at_str = t.due_at ? format(t.due_at, "yyyy-MM-dd") : "";
     });
-    // ---- Render view with layout ----
-    res.render("layout", {
-      title: "Dashboard",
-      body: ejs.render(
-        fs.readFileSync(path.join(__dirname, "../Views/Pages/dashboard.ejs"), "utf8"),
-        {
-          kpis,
-          graph,
-          upcoming,
-          leads,
-          tasks,
-          active: "dashboard"
-        }
-      )
-    });
+   // ---- Render view ----
+res.render("Pages/dashboard", {
+  title: "Dashboard",
+  active: "dashboard",
+  kpis,
+  graph,
+  upcoming,
+  leads,
+  tasks
+});
   } catch (err) {
     next(err);
   }
