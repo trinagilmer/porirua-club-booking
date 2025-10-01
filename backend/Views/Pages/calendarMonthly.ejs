@@ -2,40 +2,40 @@
 <html>
 <head>
   <link rel="stylesheet" href="/css/main.css">
-
   <meta charset="utf-8" />
   <title>Staff — Monthly Calendar</title>
   <style>
     body { font-family: system-ui, Arial, sans-serif; margin: 20px; }
     header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
-    .nav a { margin-left: 8px; }
+    .nav a { margin-right: 8px; text-decoration:none; color:#1d4ed8; }
+    table { width:100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { border: 1px solid #ddd; padding: 6px; vertical-align: top; width:14.28%; }
+    th { background: #f5f5f5; text-align: center; }
+    .muted { color:#6b7280; font-size:.85rem; }
+    .today { background:#FEF9C3; }
+    .past { color:#6b7280; }
+    .other-month { background:#fafafa; color:#9ca3af; }
+    ul { margin:0; padding-left: 12px; }
 
-    .grid { display:grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 12px; }
-    .cell { border:1px solid #ddd; min-height: 120px; padding:8px; background:#fff; }
-    .head { font-weight:600; margin-bottom: 6px; }
-    .muted { color:#6b7280; font-size:.9rem; }
-    .other { background:#fafafa; }
-    .today { outline:2px solid #f59e0b; }
-    ul { margin:0; padding-left: 16px; }
-
-    /* Legend + badges + greyed bookings */
-    .legend { margin: 6px 0; color:#6b7280; font-size:.9rem; }
+    .legend { color:#6b7280; font-size:.9rem; margin-top:6px; }
     .i { padding:2px 6px; border-radius:10px; font-size:.75rem; border:1px solid #e5e7eb; }
-    .i.fn { background:#eef2ff; color:#3730a3; border-color:#c7d2fe; } /* Function */
-    .i.bk { background:#f3f4f6; color:#374151; border-color:#e5e7eb; } /* Booking */
-    .ev.bk { color:#6b7280; } /* grey text for bookings */
+    .i.fn { background:#eef2ff; color:#3730a3; border-color:#c7d2fe; }
+    .i.bk { background:#f3f4f6; color:#374151; border-color:#e5e7eb; }
 
-    /* optional: subtle conflict highlight if both exist */
-    .cell.has-both { box-shadow: inset 0 0 0 2px #fde68a; } /* amber ring */
+    .ev a { text-decoration:none; color:inherit; display:block; padding:2px 0; }
+    .ev.fn a:hover { background:#eef2ff; border-radius:6px; padding:2px; }
+    .ev.bk a:hover { background:#f3f4f6; border-radius:6px; padding:2px; }
   </style>
 </head>
 <body>
   <%- include('../Partials/header', { active: 'calendar' }) %>
+
   <header>
-    <h1>Monthly Calendar — <%= monthLabel %></h1>
+    <h1>Monthly Calendar</h1>
     <div class="nav">
-      <a href="/staff/calendar/monthly?month=<%= prevMonth %>">◀ <%= prevMonth %></a>
-      <a href="/staff/calendar/monthly?month=<%= nextMonth %>"><%= nextMonth %> ▶</a>
+      <a href="/staff/calendar/monthly?month=<%= prevMonth %>">◀ Prev</a>
+      <a href="/staff/calendar/monthly?month=<%= nextMonth %>">Next ▶</a>
+      <span class="muted"><%= monthLabel %></span>
     </div>
   </header>
 
@@ -44,51 +44,50 @@
     <span class="i bk">Booking</span>
   </div>
 
-  <div class="grid">
-    <% (days || []).forEach(d => { 
-         const list = (events && events[d.dateKey]) || [];
-         const hasFn = list.some(x => x.evtype === 'function');
-         const hasBk = list.some(x => x.evtype === 'booking');
-         const cellCls = [
-           d.isOtherMonth ? 'other' : '',
-           d.isToday ? 'today' : '',
-           (hasFn && hasBk) ? 'has-both' : ''
-         ].filter(Boolean).join(' ');
-    %>
-      <div class="cell <%= cellCls %>">
-        <div class="head"><%= d.dateStr %></div>
-
-        <% if (!list.length) { %>
-          <div class="muted">—</div>
-        <% } else { %>
-          <ul>
-            <% list.forEach(ev => { %>
-              <% if (ev.evtype === 'booking') { %>
-                <!-- Greyed-out booking -->
-                <li class="ev bk">
-                  <span class="i bk">Booking</span>
-                  <strong><%= ev.name %></strong>
-                  <% if (ev.type) { %> · <%= ev.type %><% } %>
-                  <% if (ev.guests) { %> · <%= ev.guests %> pax<% } %>
-                  <% if (ev.status) { %> · <%= ev.status %><% } %>
-                </li>
+  <table>
+    <thead>
+      <tr>
+        <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% for (let w=0; w < days.length; w += 7) { %>
+        <tr>
+          <% days.slice(w, w+7).forEach(d => { 
+               const list = (events && events[d.dateKey]) || []; %>
+            <td class="<%= d.isToday ? 'today' : '' %> <%= d.isOtherMonth ? 'other-month' : '' %>">
+              <div><strong><%= d.dateStr %></strong></div>
+              <% if (!list.length) { %>
+                <div class="muted">—</div>
               <% } else { %>
-                <!-- Function -->
-                <li class="ev fn">
-                  <span class="i fn">Function</span>
-                  <strong><%= ev.event_name %></strong>
-                  <% if (ev.room) { %> — <%= ev.room %><% } %>
-                  <% if (ev.attendees) { %> · <%= ev.attendees %> pax<% } %>
-                </li>
+<ul style="margin:0;padding-left:16px;">
+  <% list.forEach(ev => { %>
+    <li class="ev"
+        data-type="<%= ev.evtype %>"
+        data-id="<%= ev.id %>"
+        data-name="<%= ev.event_name || ev.name %>"
+        data-room="<%= ev.room || '' %>"
+        data-attendees="<%= ev.attendees || ev.guests || '' %>"
+        data-status="<%= ev.status || '' %>">
+      <span class="badge <%= ev.evtype %>"><%= ev.evtype === 'function' ? 'Function' : 'Booking' %></span>
+      <strong><%= ev.event_name || ev.name %></strong>
+      <% if (ev.room) { %> — <%= ev.room %><% } %>
+      <% if (ev.attendees) { %> · <%= ev.attendees %> pax<% } %>
+      <% if (ev.status) { %> · <%= ev.status %><% } %>
+    </li>
+  <% }) %>
+</ul>
+
               <% } %>
-            <% }) %>
-          </ul>
-        <% } %>
-      </div>
-    <% }) %>
-  </div>
+            </td>
+          <% }) %>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
 </body>
 </html>
+
 
 
 

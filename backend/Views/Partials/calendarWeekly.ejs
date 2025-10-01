@@ -1,30 +1,17 @@
-<div class="weekly-cal">
+<div class="weekly-cal calendar">
   <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0;">
     <div><strong>Week:</strong> <%= start %> → <%= end %></div>
     <div>
-      <%
-// helper to shift ISO date by days
-function shift(dateStr, days) {
-  const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() + days);
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,'0');
-  const dd = String(d.getDate()).padStart(2,'0');
-  return `${y}-${m}-${dd}`;
-}
-      %>
       <a href="/staff/calendar/weekly?start=<%= shift(start, -7) %>">◀ Prev</a>
       <a href="/staff/calendar/weekly?start=<%= shift(start,  7) %>" style="margin-left:8px;">Next ▶</a>
     </div>
   </div>
 
-  <table style="width:100%;border-collapse:collapse;">
+  <table class="pc-table">
     <thead>
       <tr>
         <% (days || []).forEach(d => { %>
-          <th style="border:1px solid #ddd;padding:8px;background:#f5f5f5;text-align:left;">
-            <%= d.dateStr %>
-          </th>
+          <th><%= d.dateStr %></th>
         <% }) %>
       </tr>
     </thead>
@@ -32,22 +19,39 @@ function shift(dateStr, days) {
       <tr>
         <% (days || []).forEach(d => { 
              const list = (events && events[d.dateKey]) || []; %>
-          <td style="border:1px solid #ddd;vertical-align:top;padding:8px;<%= d.isToday ? 'background:#FEF9C3;' : '' %>">
+          <td class="<%= d.isToday ? 'today' : (d.isPast ? 'past' : '') %>">
             <% if (!list.length) { %>
-              <div style="color:#6b7280;">No events</div>
+              <div class="muted">No events</div>
             <% } else { %>
               <ul style="margin:0;padding-left:16px;">
                 <% list.forEach(ev => { %>
-                  <li>
-                    <strong><%= ev.event_name %></strong>
-                    <% if (ev.room) { %> — <%= ev.room %><% } %>
-                    <% if (ev.attendees) { %> · <%= ev.attendees %> pax<% } %>
-                    <% if (ev.contact_name || ev.contact_phone) { %>
-                      <div style="color:#6b7280;">
-                        <%= ev.contact_name || '' %><%= ev.contact_phone ? ' · ' + ev.contact_phone : '' %>
-                      </div>
-                    <% } %>
-                  </li>
+                  <% if (ev.evtype === 'booking') { %>
+                    <!-- Booking -->
+                    <li class="ev bk">
+                      <span class="i bk">Booking</span>
+                      <a href="/bookings/<%= ev.id %>" class="muted">
+                        <strong><%= ev.name %></strong>
+                      </a>
+                      <% if (ev.type) { %> · <%= ev.type %><% } %>
+                      <% if (ev.guests) { %> · <%= ev.guests %> pax<% } %>
+                      <% if (ev.status) { %> · <%= ev.status %><% } %>
+                    </li>
+                  <% } else { %>
+                    <!-- Function -->
+                    <li class="ev fn">
+                      <span class="i fn">Function</span>
+                      <a href="/api/functions/<%= ev.id %>/edit">
+                        <strong><%= ev.event_name %></strong>
+                      </a>
+                      <% if (ev.room) { %> — <%= ev.room %><% } %>
+                      <% if (ev.attendees) { %> · <%= ev.attendees %> pax<% } %>
+                      <% if (ev.contact_name || ev.contact_phone) { %>
+                        <div class="muted">
+                          <%= ev.contact_name || '' %><%= ev.contact_phone ? ' · ' + ev.contact_phone : '' %>
+                        </div>
+                      <% } %>
+                    </li>
+                  <% } %>
                 <% }) %>
               </ul>
             <% } %>
@@ -57,3 +61,6 @@ function shift(dateStr, days) {
     </tbody>
   </table>
 </div>
+
+<%- include('../Partials/calendarModal') %>
+

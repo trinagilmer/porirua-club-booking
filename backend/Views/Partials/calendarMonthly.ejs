@@ -1,4 +1,4 @@
-<div class="monthly-cal">
+<div class="monthly-cal calendar">
   <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0;">
     <h2 style="margin:0;">Monthly — <%= monthLabel %></h2>
     <div>
@@ -7,21 +7,38 @@
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;">
+  <div class="grid">
     <% (days || []).forEach(d => { 
          const list = (events && events[d.dateKey]) || []; %>
-      <div style="border:1px solid #ddd;min-height:110px;padding:8px;<%= d.isOtherMonth ? 'background:#fafafa;' : '' %><%= d.isToday ? 'outline:2px solid #f59e0b;' : '' %>">
-        <div style="font-weight:600;margin-bottom:6px;"><%= d.dateStr %></div>
+      <div class="cell <%= d.isOtherMonth ? 'other' : '' %> <%= d.isToday ? 'today' : '' %>">
+        <div class="head"><%= d.dateStr %></div>
         <% if (!list.length) { %>
-          <div style="color:#6b7280;">—</div>
+          <div class="muted">—</div>
         <% } else { %>
           <ul style="margin:0;padding-left:16px;">
             <% list.forEach(ev => { %>
-              <li>
-                <strong><%= ev.event_name %></strong>
-                <% if (ev.room) { %> — <%= ev.room %><% } %>
-                <% if (ev.attendees) { %> · <%= ev.attendees %> pax<% } %>
-              </li>
+              <% if (ev.evtype === 'booking') { %>
+                <!-- Greyed booking -->
+                <li class="ev bk">
+                  <span class="i bk">Booking</span>
+                  <a href="/bookings/<%= ev.id %>" class="muted">
+                    <strong><%= ev.name %></strong>
+                  </a>
+                  <% if (ev.type) { %> · <%= ev.type %><% } %>
+                  <% if (ev.guests) { %> · <%= ev.guests %> pax<% } %>
+                  <% if (ev.status) { %> · <%= ev.status %><% } %>
+                </li>
+              <% } else { %>
+                <!-- Function -->
+                <li class="ev fn">
+                  <span class="i fn">Function</span>
+                  <a href="/api/functions/<%= ev.id %>/edit">
+                    <strong><%= ev.event_name %></strong>
+                  </a>
+                  <% if (ev.room) { %> — <%= ev.room %><% } %>
+                  <% if (ev.attendees) { %> · <%= ev.attendees %> pax<% } %>
+                </li>
+              <% } %>
             <% }) %>
           </ul>
         <% } %>
@@ -29,3 +46,7 @@
     <% }) %>
   </div>
 </div>
+
+
+<%- include('../Partials/calendarModal') %>
+

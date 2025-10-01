@@ -4,105 +4,122 @@
   <%- include('../Partials/head') %>
   <meta charset="utf-8" />
   <title>Dashboard</title>
-  <link rel="stylesheet" href="/css/main.css">
   <style>
-    body { font-family: system-ui, Arial, sans-serif; margin: 24px; background:#fafafa; }
-    header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+    body { margin:0; font-family: system-ui, Arial, sans-serif; background:#f9fafb; display:flex; }
+    .sidebar {
+      width: 220px; background:#1f2937; color:#fff; padding:20px; min-height:100vh;
+    }
+    .sidebar h2 { font-size:1.2rem; margin-bottom:1rem; }
+    .sidebar a { display:block; color:#d1d5db; margin:8px 0; text-decoration:none; }
+    .sidebar a.active, .sidebar a:hover { color:#fff; font-weight:bold; }
+
+    .main { flex:1; padding:24px; }
+    header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
     .muted { color:#6b7280; }
-    .kpis { display:grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap:12px; }
+    .kpis { display:grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap:12px; margin-bottom:20px; }
     .kpi { border:1px solid #e5e7eb; border-radius:10px; padding:12px; background:#fff; }
-    table { width:100%; border-collapse: collapse; }
+    table { width:100%; border-collapse: collapse; background:#fff; }
     th, td { padding:8px; border-bottom:1px solid #e5e7eb; text-align:left; }
     .pill { padding:2px 8px; border-radius:999px; font-size:.8rem; }
     .pill.confirmed { background:#DCFCE7; color:#065F46; }
     .pill.pending { background:#FEF3C7; color:#92400E; }
-    .pill.lead { background:#EDE9FE; color:#5B21B6; }
-    .done { text-decoration: line-through; color:#6b7280; }
+    .pill.cancelled { background:#FEE2E2; color:#991B1B; }
   </style>
 </head>
 <body>
-  <%- include('../Partials/header', { active: 'dashboard' }) %>
-
-  <header>
-    <div>
-      <h1>Dashboard</h1>
-      <div class="muted">
-        Welcome <% if (user && user.name) { %><strong><%= user.name %></strong><% } %>
-      </div>
-    </div>
-    <form method="GET" action="/dashboard">
-      <label>Start <input type="date" name="start" value="<%= start %>" /></label>
-      <label>End <input type="date" name="end" value="<%= end %>" /></label>
-      <button type="submit">Apply</button>
-    </form>
-  </header>
-
-  <!-- KPIs -->
-  <div class="kpis">
-    <div class="kpi">
-      <div class="muted">Confirmed Functions (period)</div>
-      <div style="font-size:1.6rem;"><%= kpi.confirmed_count || 0 %></div>
-    </div>
-    <div class="kpi">
-      <div class="muted">Confirmed Value (period)</div>
-      <div style="font-size:1.6rem;">$<%= Number(kpi.confirmed_value || 0).toFixed(2) %></div>
-    </div>
-    <div class="kpi">
-      <div class="muted">Pending</div>
-      <div style="font-size:1.6rem;"><%= kpi.pending_count || 0 %></div>
-    </div>
-    <div class="kpi">
-      <div class="muted">Leads</div>
-      <div style="font-size:1.6rem;"><%= kpi.lead_count || 0 %></div>
-    </div>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <h2>Club Admin</h2>
+    <a href="/dashboard" class="active">Dashboard</a>
+    <a href="/staff/calendar/weekly">Weekly Calendar</a>
+    <a href="/staff/calendar/monthly">Monthly Calendar</a>
+    <a href="/staff/functions">Functions</a>
+    <a href="/staff/bookings">Enquiries</a>
+    <a href="/staff/catalog">Menus & Services</a>
+    <a href="/admin/audit">Audit Log</a>
+    <a href="/logout">Logout</a>
   </div>
 
-  <!-- Upcoming Events -->
-  <div class="card" style="margin-top:16px;">
+  <!-- Main content -->
+  <div class="main">
+    <header>
+      <div>
+        <h1>Dashboard</h1>
+        <div class="muted">
+          Welcome <% if (user && user.name) { %><strong><%= user.name %></strong><% } %>
+        </div>
+      </div>
+      <form class="row" method="GET" action="/dashboard">
+        <label>Start <input type="date" name="start" value="<%= start %>" /></label>
+        <label>End <input type="date" name="end" value="<%= end %>" /></label>
+        <button type="submit">Apply</button>
+      </form>
+    </header>
+
+    <!-- KPIs -->
+    <div class="kpis">
+      <div class="kpi">
+        <div class="muted">Confirmed Functions</div>
+        <div style="font-size:1.6rem;"><%= kpi.confirmed_count || 0 %></div>
+      </div>
+      <div class="kpi">
+        <div class="muted">Confirmed Value</div>
+        <div style="font-size:1.6rem;">$<%= Number(kpi.confirmed_value || 0).toFixed(2) %></div>
+      </div>
+      <div class="kpi">
+        <div class="muted">Pending</div>
+        <div style="font-size:1.6rem;"><%= kpi.pending_count || 0 %></div>
+      </div>
+      <div class="kpi">
+        <div class="muted">Leads</div>
+        <div style="font-size:1.6rem;"><%= kpi.lead_count || 0 %></div>
+      </div>
+    </div>
+
+    <!-- Upcoming functions -->
     <h3>Upcoming Functions</h3>
     <% if ((upcoming || []).length === 0) { %>
-      <div class="muted">No events in this period.</div>
+      <div class="muted">No functions in this period.</div>
     <% } else { %>
       <table>
         <thead>
           <tr>
             <th>Date / Time</th>
             <th>Event</th>
-            <th>Room</th>
             <th>Attendees</th>
             <th>Status</th>
-            <th>Total</th>
+            <th>Est. Total</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           <% upcoming.forEach(f => { %>
             <tr>
-              <td><%= new Date(f.event_start).toLocaleString('en-NZ', { dateStyle:'medium', timeStyle:'short' }) %></td>
-              <td><%= f.event_name %></td>
-              <td><%= f.room || '' %></td>
+              <td><%= new Date(f.start_at).toLocaleString('en-NZ', { dateStyle:'medium', timeStyle:'short' }) %></td>
+              <td><strong><%= f.event_name %></strong></td>
               <td><%= f.attendees || '' %></td>
               <td><span class="pill <%= f.status %>"><%= f.status %></span></td>
               <td>$<%= Number(f.est_total || 0).toFixed(2) %></td>
+              <td>
+                <a href="/api/functions/<%= f.id %>/edit">Edit</a>
+              </td>
             </tr>
           <% }) %>
         </tbody>
       </table>
     <% } %>
-  </div>
 
-  <!-- Open Tasks -->
-  <div class="card" style="margin-top:16px;">
-    <h3>Open Tasks</h3>
+    <!-- Tasks -->
+    <h3 style="margin-top:24px;">Open Tasks</h3>
     <% if ((tasks || []).length === 0) { %>
       <div class="muted">No open tasks</div>
     <% } else { %>
       <table>
-        <thead>
-          <tr><th>Task</th><th>Due</th><th>Assignee</th></tr>
-        </thead>
+        <thead><tr><th></th><th>Task</th><th>Due</th><th>Assignee</th></tr></thead>
         <tbody>
           <% tasks.forEach(t => { %>
             <tr>
+              <td><input type="checkbox" /></td>
               <td><%= t.title %></td>
               <td><%= t.due_date ? new Date(t.due_date).toLocaleDateString('en-NZ') : '' %></td>
               <td><%= t.assignee || '' %></td>
@@ -114,3 +131,4 @@
   </div>
 </body>
 </html>
+

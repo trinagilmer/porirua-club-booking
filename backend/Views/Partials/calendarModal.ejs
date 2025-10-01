@@ -1,0 +1,59 @@
+<!-- Views/Partials/calendarModal.ejs -->
+<div id="modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;
+     background:rgba(0,0,0,.5);align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;padding:20px;width:400px;max-width:90%;">
+    <h2 id="mTitle" style="margin-top:0;"></h2>
+    <p id="mDetails" style="color:#6b7280;"></p>
+    <div id="mActions" style="margin-top:12px;"></div>
+    <button onclick="closeModal()" style="margin-top:12px;padding:6px 12px;border:1px solid #ddd;border-radius:6px;background:#f3f4f6;cursor:pointer;">Close</button>
+  </div>
+</div>
+
+<script>
+  const modal = document.getElementById('modal');
+  const mTitle = document.getElementById('mTitle');
+  const mDetails = document.getElementById('mDetails');
+  const mActions = document.getElementById('mActions');
+
+  document.addEventListener('click', e => {
+    if (e.target.closest('.ev')) {
+      const el = e.target.closest('.ev');
+      const type = el.dataset.type;
+      const id   = el.dataset.id;
+      const name = el.dataset.name;
+      const room = el.dataset.room;
+      const att  = el.dataset.attendees;
+      const status = el.dataset.status;
+      const contact = el.dataset.contact;
+      const phone = el.dataset.phone;
+
+      mTitle.textContent = (type === 'function' ? "Function: " : "Booking: ") + name;
+      mDetails.textContent = [
+        room ? "Room: " + room : "",
+        att ? "Attendees: " + att : "",
+        status ? "Status: " + status : "",
+        contact ? "Contact: " + contact : "",
+        phone ? "Phone: " + phone : ""
+      ].filter(Boolean).join(" · ");
+
+      mActions.innerHTML = "";
+      if (type === "function") {
+        const btn = document.createElement("a");
+        btn.href = `/functions/${id}/edit`;
+        btn.textContent = "Edit Function";
+        btn.style.cssText = "padding:6px 12px;border-radius:6px;background:#3b82f6;color:#fff;text-decoration:none;margin-right:8px;";
+        mActions.appendChild(btn);
+      } else {
+        const btn = document.createElement("a");
+        btn.href = `/bookings/${id}`;
+        btn.textContent = "View Booking";
+        btn.style.cssText = "padding:6px 12px;border-radius:6px;background:#6b7280;color:#fff;text-decoration:none;margin-right:8px;";
+        mActions.appendChild(btn);
+      }
+
+      modal.style.display = "flex";
+    }
+  });
+
+  function closeModal() { modal.style.display = "none"; }
+</script>
