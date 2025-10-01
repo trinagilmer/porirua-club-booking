@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <%- include('../Partials/head') %>
+  <%- include('partials/head') %>
   <title><%= title || "Porirua Club" %></title>
 </head>
 <body class="pc-theme">
 
-  <!-- Global Header -->
-  <%- include('../Partials/header', { active: active }) %>
+  <%- include('partials/header') %>
 
-  <!-- Main Page Content -->
-  <main class="app-main container">
+  <main style="padding: 20px;">
     <%- body %>
   </main>
 
 </body>
 </html>
+
+

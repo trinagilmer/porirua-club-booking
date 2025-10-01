@@ -100,18 +100,18 @@ router.get("/", requireLogin, async (req, res, next) => {
     });
 
     // ---- Render view ----
-    res.render("Pages/dashboard", {
-      active: "dashboard",
-      kpis,
-      graph,
-      upcoming,
-      leads,
-      tasks,
-    });
-  } catch (err) {
-    next(err);
-  }
+   res.render("layout", {
+  title: "Dashboard",
+  body: ejs.render(fs.readFileSync(path.join(__dirname, "../Views/Pages/dashboard.ejs"), "utf8"), {
+    kpis,
+    graph,
+    upcoming,
+    leads,
+    tasks,
+    active: "dashboard"
+  })
 });
+
 
 module.exports = router;
 
