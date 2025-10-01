@@ -5,13 +5,17 @@ if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL is not set');
 }
 
-// Only enable SSL when DATABASE_SSL=require (e.g. on Render)
-const sslEnabled = process.env.DATABASE_SSL === 'require';
+// Supabase/Postgres SSL setup
+// Default: require SSL (Supabase always needs it). 
+// DATABASE_SSL=disable only if you're connecting to a local Postgres.
+let sslConfig = { rejectUnauthorized: false };
+if (String(process.env.DATABASE_SSL || '').toLowerCase() === 'disable') {
+  sslConfig = false;
+}
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-
-  ssl: sslEnabled ? { rejectUnauthorized: false } : false,
+  ssl: sslConfig,
 
   // Pool hygiene (good defaults for hosted Postgres)
   max: parseInt(process.env.PG_MAX || '5', 10),
@@ -25,7 +29,6 @@ const pool = new Pool({
   keepAliveInitialDelayMillis: 10000,
 
   allowExitOnIdle: true,
-
   application_name: process.env.APP_NAME || 'porirua-club',
 });
 
@@ -34,7 +37,7 @@ pool.on('error', (err) => {
   console.warn('[pg] idle client error (usually safe):', err.code || err.message);
 });
 
-// Graceful shutdown on platform signals
+// Graceful shutdown
 const shutdown = async (sig) => {
   try {
     await pool.end();
