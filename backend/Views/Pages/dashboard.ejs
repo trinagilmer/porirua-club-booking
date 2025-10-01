@@ -4,6 +4,8 @@
 <head>
   <%- include('../Partials/head') %>
   <title>Dashboard – Porirua Club</title>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="pc-theme">
 
@@ -37,6 +39,41 @@
         <div class="kpi-value"><%= kpis.pipeline_count || 0 %></div>
       </div>
     </div>
+
+    <!-- Revenue Graph -->
+    <div class="card" style="margin:20px 0;">
+      <h2>Revenue Trend (Last 12 Months)</h2>
+      <canvas id="revenueChart" style="max-height:300px;"></canvas>
+    </div>
+
+    <script>
+      // Chart data comes from server as JSON
+      const revenueLabels = <%- JSON.stringify(graph.labels || []) %>;
+      const revenueData   = <%- JSON.stringify(graph.data   || []) %>;
+
+      const ctx = document.getElementById('revenueChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: revenueLabels,
+          datasets: [{
+            label: 'Revenue (Confirmed+)',
+            data: revenueData,
+            borderColor: '#6bb4de',
+            backgroundColor: 'rgba(107, 180, 222, 0.2)',
+            tension: 0.3,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } }
+          }
+        }
+      });
+    </script>
 
     <!-- Layout: side panel + main -->
     <div class="row" style="margin-top:20px; align-items: flex-start;">
@@ -140,3 +177,4 @@
   </div>
 </body>
 </html>
+
