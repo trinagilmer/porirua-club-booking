@@ -88,7 +88,7 @@ if (taskRoutes) app.use("/api/tasks", requireLogin, taskRoutes);
 
 // Audit + Dashboard
 app.use("/admin/audit", auditRoutes);
-app.use("/dashboard", dashboardRoutes);
+app.use("/dashboard", requireLogin, dashboardRoutes); // 🔒 protected
 
 // ---- Health checks ----
 app.get("/health", (_req, res) => res.json({ ok: true }));
@@ -132,4 +132,5 @@ if (require.main === module) {
 }
 
 module.exports = app;
+
 
