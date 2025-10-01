@@ -5,74 +5,71 @@
   <title>Dashboard</title>
 </head>
 <body>
-  <%- include('../Partials/header', { active: active }) %>
+  <div class="layout">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <img src="/img/pc-logo.jpg" alt="Porirua Club" class="logo">
+        <h2>Porirua Club</h2>
+      </div>
+      <nav>
+        <ul>
+          <li class="<%= active === 'dashboard' ? 'active' : '' %>"><a href="/dashboard">Dashboard</a></li>
+          <li><a href="/calendar/weekly">Calendar – Weekly</a></li>
+          <li><a href="/calendar/monthly">Calendar – Monthly</a></li>
+          <li><a href="/functions">Functions</a></li>
+          <li><a href="/bookings">Restaurant Bookings</a></li>
+          <li><a href="/catalog">Menus & Services</a></li>
+          <li><a href="/tasks">Tasks</a></li>
+          <li><a href="/contacts">Contacts</a></li>
+          <li><a href="/surveys">Surveys</a></li>
+          <li><a href="/reports">Reports</a></li>
+          <li><a href="/audit">Admin → Audit</a></li>
+        </ul>
+      </nav>
+    </aside>
 
-  <div class="container" style="margin-top:24px;">
-    <!-- KPIs -->
-    <div class="pc-kpis">
-      <div class="kpi-card">
-        <div class="kpi-label">Confirmed+ Revenue</div>
-        <div class="kpi-value">
-          $<%= (kpis.confirmed_price || 0).toLocaleString() %>
+    <!-- Main Content -->
+    <main class="content">
+      <%- include('../Partials/header', { active: active }) %>
+
+      <div class="container" style="margin-top:24px;">
+        
+        <!-- Date Filters -->
+        <form method="GET" action="/dashboard" class="filter-form" style="margin-bottom:20px;">
+          <label>From: <input type="date" name="from" value="<%= filters?.from || '' %>"></label>
+          <label>To: <input type="date" name="to" value="<%= filters?.to || '' %>"></label>
+          <button type="submit" class="btn">Apply</button>
+          <button type="submit" name="quick" value="week" class="btn">This Week</button>
+          <button type="submit" name="quick" value="month" class="btn">This Month</button>
+        </form>
+
+        <!-- KPIs -->
+        <div class="pc-kpis">
+          <div class="kpi-card">
+            <div class="kpi-label">Confirmed+ Revenue</div>
+            <div class="kpi-value">$<%= (kpis.confirmed_price || 0).toLocaleString() %></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Confirmed+ Cost</div>
+            <div class="kpi-value">$<%= (kpis.confirmed_cost || 0).toLocaleString() %></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Pipeline Value</div>
+            <div class="kpi-value">$<%= (kpis.pipeline_price || 0).toLocaleString() %></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Pipeline Leads</div>
+            <div class="kpi-value"><%= kpis.pipeline_count || 0 %></div>
+          </div>
         </div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Confirmed+ Cost</div>
-        <div class="kpi-value">
-          $<%= (kpis.confirmed_cost || 0).toLocaleString() %>
+
+        <!-- Revenue Graph -->
+        <div class="card" style="margin:20px 0;">
+          <h2>Revenue Trend (Last 12 Months)</h2>
+          <canvas id="revenueChart" style="max-height:300px;"></canvas>
         </div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Pipeline Value</div>
-        <div class="kpi-value">
-          $<%= (kpis.pipeline_price || 0).toLocaleString() %>
-        </div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Pipeline Leads</div>
-        <div class="kpi-value"><%= kpis.pipeline_count || 0 %></div>
-      </div>
-    </div>
 
-    <!-- Revenue Graph -->
-    <div class="card" style="margin:20px 0;">
-      <h2>Revenue Trend (Last 12 Months)</h2>
-      <canvas id="revenueChart" style="max-height:300px;"></canvas>
-    </div>
-
-    <script>
-      const revenueLabels = <%- JSON.stringify(graph.labels || []) %>;
-      const revenueData   = <%- JSON.stringify(graph.data   || []) %>;
-
-      const ctx = document.getElementById('revenueChart').getContext('2d');
-      new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: revenueLabels,
-          datasets: [{
-            label: 'Revenue (Confirmed+)',
-            data: revenueData,
-            borderColor: '#6bb4de',
-            backgroundColor: 'rgba(107, 180, 222, 0.2)',
-            tension: 0.3,
-            fill: true
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } }
-          }
-        }
-      });
-    </script>
-
-    <!-- Layout: side panel + main -->
-    <div class="row" style="margin-top:20px; align-items: flex-start;">
-
-      <!-- Main content -->
-      <div style="flex:3; min-width:0;">
         <!-- Upcoming Functions -->
         <div class="card" style="margin-bottom:20px;">
           <h2>Upcoming Functions</h2>
@@ -100,9 +97,7 @@
                   <td><strong><%= fn.event_name %></strong></td>
                   <td><%= fn.room_name || '—' %></td>
                   <td><%= fn.attendees || '—' %></td>
-                  <td>
-                    <span class="status-badge status-<%= fn.status %>"><%= fn.status %></span>
-                  </td>
+                  <td><span class="status-badge status-<%= fn.status %>"><%= fn.status %></span></td>
                   <td>$<%= (fn.totals_price || 0).toLocaleString() %></td>
                   <td><a href="/api/functions/<%= fn.id %>/edit" class="btn ghost">Edit</a></td>
                 </tr>
@@ -112,7 +107,7 @@
         </div>
 
         <!-- Recent Leads -->
-        <div class="card">
+        <div class="card" style="margin-bottom:20px;">
           <h2>Recent Leads</h2>
           <table class="pc-table">
             <thead>
@@ -141,31 +136,79 @@
             </tbody>
           </table>
         </div>
-      </div>
 
-      <!-- Sidebar -->
-      <div style="flex:1; margin-left:20px; min-width:250px;">
+        <!-- My Tasks -->
         <div class="card">
-          <h3>My Tasks</h3>
+          <h2>My Tasks</h2>
           <% if (!tasks.length) { %>
             <div class="muted">No open tasks</div>
           <% } else { %>
-            <ul style="margin:0; padding-left:16px;">
-              <% tasks.forEach(t => { %>
-                <li>
-                  <strong><%= t.title %></strong>
-                  <% if (t.assignee) { %> <span class="muted">· <%= t.assignee %></span><% } %>
-                  <% if (t.due_at) { %><br><span class="muted">Due: <%= t.due_at.toISOString().slice(0,10) %></span><% } %>
-                </li>
-              <% }) %>
-            </ul>
+            <table class="pc-table">
+              <thead>
+                <tr>
+                  <th>Task</th>
+                  <th>Assignee</th>
+                  <th>Due</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% tasks.forEach(t => { %>
+                  <tr>
+                    <td><%= t.title %></td>
+                    <td><%= t.assignee || '—' %></td>
+                    <td><%= t.due_at ? t.due_at.toISOString().slice(0,10) : '—' %></td>
+                    <td><%= t.status %></td>
+                    <td>
+                      <a href="/tasks/<%= t.id %>" class="btn-sm">View</a>
+                      <a href="/tasks/<%= t.id %>/edit" class="btn-sm">Edit</a>
+                      <form method="POST" action="/tasks/<%= t.id %>/toggle" style="display:inline;">
+                        <button type="submit" class="btn-sm"><%= t.status === 'complete' ? 'Undo' : 'Complete' %></button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
           <% } %>
         </div>
       </div>
-    </div>
+    </main>
   </div>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const revenueLabels = <%- JSON.stringify(graph.labels || []) %>;
+    const revenueData   = <%- JSON.stringify(graph.data   || []) %>;
+
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: revenueLabels,
+        datasets: [{
+          label: 'Revenue (Confirmed+)',
+          data: revenueData,
+          borderColor: '#6bb4de',
+          backgroundColor: 'rgba(107, 180, 222, 0.2)',
+          tension: 0.3,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } }
+        }
+      }
+    });
+  </script>
 </body>
 </html>
+
 
 
 
