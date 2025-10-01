@@ -1,0 +1,40 @@
+<!-- backend/Views/audit/recent.ejs -->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Recent Activity</title>
+  <link rel="stylesheet" href="/css/main.css" />
+</head>
+<body>
+  <%- include('../partials/header') %>
+
+  <main class="container">
+    <h1>Recent Activity</h1>
+
+    <table class="table">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Who</th>
+          <th>Entity</th>
+          <th>Action</th>
+          <th>ID</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% activities.forEach(a => { %>
+          <tr>
+            <td><%= new Date(a.at).toLocaleString() %></td>
+            <td><%= a.actor_name || "System" %> (<%= a.actor_email || "n/a" %>)</td>
+            <td><%= a.entity_type %></td>
+            <td><%= a.action %></td>
+            <td><%= a.entity_id %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </main>
+
+  <%- include('../partials/footer') %>
+</body>
+</html>

@@ -2,6 +2,8 @@
 const path = require('path');
 const express = require('express');
 const session = require('express-session');
+const auditRoutes = require("./routes/audit");
+const dashboardRoutes = require("./routes/dashboard");
 
 // Load env from backend/.env (hosted platforms use their own env panel)
 require('dotenv').config({ path: path.join(__dirname, '.env') });
@@ -35,7 +37,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ---- Sessions ----
-// In production over HTTPS, secure cookies are sent automatically when trust proxy is on.
 app.use(
   session({
     name: process.env.SESSION_NAME || 'pcb.sid',
@@ -45,11 +46,12 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: 'lax',
-      secure: 'auto', // auto-secure in HTTPS, off in HTTP
-      maxAge: parseInt(process.env.SESSION_TTL_MS || `${1000 * 60 * 60 * 8}`, 10), // 8h
+      secure: 'auto',
+      maxAge: parseInt(process.env.SESSION_TTL_MS || `${1000 * 60 * 60 * 8}`, 10),
     },
   })
 );
+
 
 // Expose session user to views as `user`
 app.use((req, res, next) => {
@@ -57,17 +59,23 @@ app.use((req, res, next) => {
   next();
 });
 
-// ---- DB health ----
+// 🔑 DB Context Middleware — sets actor_id for audit logs
 const pool = require('./db');
-app.get('/db/health', async (_req, res) => {
+app.use(async (req, res, next) => {
   try {
-    const { rows } = await pool.query('select now() as now');
-    res.json({ ok: true, now: rows[0].now });
-  } catch (e) {
-    console.error('[db/health] error:', e);
-    res.status(500).json({ ok: false, error: e.message });
+    if (req.session?.user?.id) {
+      await pool.query('SET LOCAL app.current_user_id = $1', [req.session.user.id]);
+    } else {
+      // Optional fallback: -1 = system/anon
+      await pool.query('SET LOCAL app.current_user_id = -1');
+    }
+    next();
+  } catch (err) {
+    console.error('[dbContext] error:', err);
+    next(err);
   }
 });
+
 
 // ---- Routes (each exports an Express Router) ----
 const authRoutes        = require('./routes/auth');
@@ -101,6 +109,14 @@ app.use('/staff/bookings',  requireLogin, staffBookings);
 // Optional protected APIs
 if (catalogRoutes) app.use('/api/catalog', requireLogin, catalogRoutes);
 if (taskRoutes)    app.use('/api/tasks',   requireLogin, taskRoutes);
+
+// ---- Dashboard (protected) ----
+const dashboardRoutes = require("./routes/dashboard");
+app.use("/dashboard", dashboardRoutes);
+
+// ---- Admin-only audit feed ----
+const auditRoutes = require("./routes/audit");
+app.use("/admin/audit", auditRoutes);
 
 // ---- Health ----
 app.get('/health', (_req, res) => res.json({ ok: true }));
