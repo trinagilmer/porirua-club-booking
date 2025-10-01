@@ -1,98 +1,117 @@
 // backend/routes/dashboard.js
 const express = require("express");
-const router = express.Router();
 const pool = require("../db");
+const { startOfMonth, subMonths, format } = require("date-fns");
 const { requireLogin } = require("../Middleware/authMiddleware");
 
-/**
- * Dashboard route (staff landing page)
- */
+const router = express.Router();
+
+// Dashboard main route
 router.get("/", requireLogin, async (req, res, next) => {
   try {
-    // --- KPIs ---
-    const kpiSql = `
+    const userId = req.session.user?.id;
+
+    // ---- 1. KPIs ----
+    const { rows: kpiRows } = await pool.query(`
       SELECT
-        COALESCE(SUM(CASE WHEN status IN ('confirmed','deposit_paid','invoiced','completed') THEN totals_price END), 0) AS confirmed_price,
-        COALESCE(SUM(CASE WHEN status IN ('confirmed','deposit_paid','invoiced','completed') THEN totals_cost END), 0) AS confirmed_cost,
-        COALESCE(SUM(CASE WHEN status IN ('lead','pending') THEN totals_price END), 0) AS pipeline_price,
+        COALESCE(SUM(CASE WHEN status IN ('confirmed','deposit_paid','invoiced','completed')
+                          THEN totals_price ELSE 0 END),0) AS confirmed_price,
+        COALESCE(SUM(CASE WHEN status IN ('confirmed','deposit_paid','invoiced','completed')
+                          THEN totals_cost ELSE 0 END),0) AS confirmed_cost,
+        COALESCE(SUM(CASE WHEN status IN ('lead','pending')
+                          THEN totals_price ELSE 0 END),0) AS pipeline_price,
         COUNT(*) FILTER (WHERE status IN ('lead','pending')) AS pipeline_count
-      FROM functions;
-    `;
-    const kpiRow = (await pool.query(kpiSql)).rows[0];
+      FROM functions
+    `);
+    const kpis = kpiRows[0];
 
-    const kpis = {
-      confirmed_price: Number(kpiRow.confirmed_price || 0),
-      confirmed_cost: Number(kpiRow.confirmed_cost || 0),
-      pipeline_price: Number(kpiRow.pipeline_price || 0),
-      pipeline_count: Number(kpiRow.pipeline_count || 0),
-    };
-
-    // --- Upcoming functions (next 30 days) ---
-    const upcomingSql = `
-      SELECT f.id, f.event_name, f.event_date, f.event_time, f.attendees,
-             f.status, f.totals_price, r.name AS room_name
-      FROM functions f
-      LEFT JOIN rooms r ON r.id = f.room_id
-      WHERE f.event_date >= current_date
-        AND f.status NOT IN ('cancelled')
-      ORDER BY f.event_date ASC
-      LIMIT 10;
-    `;
-    const upcoming = (await pool.query(upcomingSql)).rows;
-
-    // --- Recent leads (last 10) ---
-    const leadsSql = `
-      SELECT id, client_name, client_email, client_phone,
-             desired_start, status
-      FROM leads
-      ORDER BY created_at DESC
-      LIMIT 10;
-    `;
-    const leads = (await pool.query(leadsSql)).rows;
-
-    // --- Open tasks (assigned to current user OR unassigned) ---
-    const tasksSql = `
-      SELECT t.id, t.title, t.due_at,
-             u.name AS assignee
-      FROM tasks t
-      LEFT JOIN users u ON u.id = t.assigned_user_id
-      WHERE t.status = 'open'
-        AND (t.assigned_user_id IS NULL OR t.assigned_user_id = $1)
-      ORDER BY t.due_at NULLS LAST, t.created_at ASC
-      LIMIT 10;
-    `;
-    const tasks = (await pool.query(tasksSql, [req.session.user.id])).rows;
-
-    // --- Revenue Trend (last 12 months, confirmed+) ---
-    const revenueSql = `
-      SELECT to_char(date_trunc('month', event_date), 'Mon YYYY') AS label,
+    // ---- 2. Revenue Trend (last 12 months) ----
+    const startDate = startOfMonth(subMonths(new Date(), 11));
+    const { rows: revenueRows } = await pool.query(
+      `
+      SELECT to_char(date_trunc('month', event_start), 'YYYY-MM') AS ym,
              SUM(totals_price) AS revenue
       FROM functions
       WHERE status IN ('confirmed','deposit_paid','invoiced','completed')
-        AND event_date >= (current_date - interval '12 months')
-      GROUP BY 1
-      ORDER BY MIN(event_date);
-    `;
-    const revRows = (await pool.query(revenueSql)).rows;
+        AND event_start >= $1
+      GROUP BY ym
+      ORDER BY ym ASC
+      `,
+      [startDate]
+    );
 
     const graph = {
-      labels: revRows.map(r => r.label),
-      data: revRows.map(r => Number(r.revenue || 0)),
+      labels: revenueRows.map(r => r.ym),
+      data: revenueRows.map(r => parseFloat(r.revenue || 0)),
     };
 
-    // Render EJS view
+    // ---- 3. Upcoming Functions (next 30 days) ----
+    const { rows: upcoming } = await pool.query(
+      `
+      SELECT f.id, f.event_name, f.attendees, f.status, f.totals_price,
+             f.event_date, f.event_time,
+             r.name AS room_name
+      FROM functions f
+      LEFT JOIN rooms r ON r.id = f.room_id
+      WHERE f.event_start >= now()
+        AND f.event_start <= now() + interval '30 days'
+      ORDER BY f.event_start ASC
+      `
+    );
+
+    upcoming.forEach(fn => {
+      fn.event_date_str = fn.event_date
+        ? format(fn.event_date, "yyyy-MM-dd")
+        : "";
+    });
+
+    // ---- 4. Recent Leads ----
+    const { rows: leads } = await pool.query(
+      `
+      SELECT id, client_name, client_email, client_phone, status, desired_start
+      FROM leads
+      ORDER BY created_at DESC
+      LIMIT 10
+      `
+    );
+
+    leads.forEach(ld => {
+      ld.desired_start_str = ld.desired_start
+        ? format(ld.desired_start, "yyyy-MM-dd")
+        : "";
+    });
+
+    // ---- 5. My Tasks (open) ----
+    const { rows: tasks } = await pool.query(
+      `
+      SELECT t.id, t.title, t.due_at, u.name AS assignee
+      FROM tasks t
+      LEFT JOIN users u ON u.id = t.assigned_user_id
+      WHERE t.status = 'open'
+        AND (t.assigned_user_id = $1 OR t.assigned_user_id IS NULL)
+      ORDER BY t.due_at NULLS LAST, t.created_at ASC
+      LIMIT 10
+      `,
+      [userId]
+    );
+
+    tasks.forEach(t => {
+      t.due_at_str = t.due_at ? format(t.due_at, "yyyy-MM-dd") : "";
+    });
+
+    // ---- Render view ----
     res.render("Pages/dashboard", {
+      active: "dashboard",
       kpis,
+      graph,
       upcoming,
       leads,
       tasks,
-      graph,
-      user: req.session.user,
     });
   } catch (err) {
-    console.error("Dashboard load error:", err);
     next(err);
   }
 });
 
 module.exports = router;
+

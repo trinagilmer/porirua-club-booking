@@ -1,180 +1,170 @@
-<!-- Views/Pages/dashboard.ejs -->
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <%- include('../Partials/head') %>
-  <title>Dashboard – Porirua Club</title>
-  <!-- Chart.js CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body class="pc-theme">
+<% /* Views/Pages/dashboard.ejs */ %>
 
-  <!-- Header -->
-  <%- include('../Partials/header', { active: 'dashboard' }) %>
+<div class="container" style="margin-top:24px;">
 
-  <div class="container" style="margin-top:24px;">
-
-    <!-- KPIs -->
-    <div class="pc-kpis">
-      <div class="kpi-card">
-        <div class="kpi-label">Confirmed+ Revenue</div>
-        <div class="kpi-value">
-          $<%= (kpis.confirmed_price || 0).toLocaleString() %>
-        </div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Confirmed+ Cost</div>
-        <div class="kpi-value">
-          $<%= (kpis.confirmed_cost || 0).toLocaleString() %>
-        </div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Pipeline Value</div>
-        <div class="kpi-value">
-          $<%= (kpis.pipeline_price || 0).toLocaleString() %>
-        </div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Pipeline Leads</div>
-        <div class="kpi-value"><%= kpis.pipeline_count || 0 %></div>
+  <!-- KPIs -->
+  <div class="pc-kpis">
+    <div class="kpi-card">
+      <div class="kpi-label">Confirmed+ Revenue</div>
+      <div class="kpi-value">
+        $<%= (kpis.confirmed_price || 0).toLocaleString() %>
       </div>
     </div>
-
-    <!-- Revenue Graph -->
-    <div class="card" style="margin:20px 0;">
-      <h2>Revenue Trend (Last 12 Months)</h2>
-      <canvas id="revenueChart" style="max-height:300px;"></canvas>
+    <div class="kpi-card">
+      <div class="kpi-label">Confirmed+ Cost</div>
+      <div class="kpi-value">
+        $<%= (kpis.confirmed_cost || 0).toLocaleString() %>
+      </div>
     </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Pipeline Value</div>
+      <div class="kpi-value">
+        $<%= (kpis.pipeline_price || 0).toLocaleString() %>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Pipeline Leads</div>
+      <div class="kpi-value"><%= kpis.pipeline_count || 0 %></div>
+    </div>
+  </div>
 
-    <script>
-      // Chart data comes from server as JSON
-      const revenueLabels = <%- JSON.stringify(graph.labels || []) %>;
-      const revenueData   = <%- JSON.stringify(graph.data   || []) %>;
+  <!-- Revenue Graph -->
+  <div class="card" style="margin:20px 0;">
+    <h2>Revenue Trend (Last 12 Months)</h2>
+    <canvas id="revenueChart" style="max-height:300px;"></canvas>
+  </div>
 
-      const ctx = document.getElementById('revenueChart').getContext('2d');
-      new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: revenueLabels,
-          datasets: [{
-            label: 'Revenue (Confirmed+)',
-            data: revenueData,
-            borderColor: '#6bb4de',
-            backgroundColor: 'rgba(107, 180, 222, 0.2)',
-            tension: 0.3,
-            fill: true
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } }
+  <script>
+    const revenueLabels = <%- JSON.stringify(graph.labels || []) %>;
+    const revenueData   = <%- JSON.stringify(graph.data   || []) %>;
+
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: revenueLabels,
+        datasets: [{
+          label: 'Revenue (Confirmed+)',
+          data: revenueData,
+          borderColor: '#6bb4de',
+          backgroundColor: 'rgba(107, 180, 222, 0.2)',
+          tension: 0.3,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { 
+            beginAtZero: true,
+            ticks: { callback: v => '$' + v.toLocaleString() }
           }
         }
-      });
-    </script>
+      }
+    });
+  </script>
 
-    <!-- Layout: side panel + main -->
-    <div class="row" style="margin-top:20px; align-items: flex-start;">
+  <!-- Layout: side panel + main -->
+  <div class="row" style="margin-top:20px; align-items: flex-start;">
 
-      <!-- Main content -->
-      <div style="flex:3; min-width:0;">
+    <!-- Main content -->
+    <div style="flex:3; min-width:0;">
 
-        <!-- Upcoming Functions -->
-        <div class="card" style="margin-bottom:20px;">
-          <h2>Upcoming Functions</h2>
-          <table class="pc-table">
-            <thead>
+      <!-- Upcoming Functions -->
+      <div class="card" style="margin-bottom:20px;">
+        <h2>Upcoming Functions</h2>
+        <table class="pc-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Title</th>
+              <th>Room</th>
+              <th>Guests</th>
+              <th>Status</th>
+              <th>Value</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!upcoming.length) { %>
+              <tr><td colspan="8" class="muted">No upcoming functions</td></tr>
+            <% } %>
+            <% upcoming.forEach(fn => { %>
               <tr>
-                <th>Date</th>
-                <th>Time</th>
-                <th>Title</th>
-                <th>Room</th>
-                <th>Guests</th>
-                <th>Status</th>
-                <th>Value</th>
-                <th></th>
+                <td><%= fn.event_date_str %></td>
+                <td><%= fn.event_time || '' %></td>
+                <td><strong><%= fn.event_name %></strong></td>
+                <td><%= fn.room_name || '—' %></td>
+                <td><%= fn.attendees || '—' %></td>
+                <td>
+                  <span class="status-badge status-<%= fn.status %>"><%= fn.status %></span>
+                </td>
+                <td>$<%= (fn.totals_price || 0).toLocaleString() %></td>
+                <td><a href="/api/functions/<%= fn.id %>/edit" class="btn ghost">Edit</a></td>
               </tr>
-            </thead>
-            <tbody>
-              <% if (!upcoming.length) { %>
-                <tr><td colspan="8" class="muted">No upcoming functions</td></tr>
-              <% } %>
-              <% upcoming.forEach(fn => { %>
-                <tr>
-                  <td><%= fn.event_date?.toISOString().slice(0,10) %></td>
-                  <td><%= fn.event_time || '' %></td>
-                  <td><strong><%= fn.event_name %></strong></td>
-                  <td><%= fn.room_name || '—' %></td>
-                  <td><%= fn.attendees || '—' %></td>
-                  <td>
-                    <span class="status-badge status-<%= fn.status %>"><%= fn.status %></span>
-                  </td>
-                  <td>$<%= (fn.totals_price || 0).toLocaleString() %></td>
-                  <td><a href="/api/functions/<%= fn.id %>/edit" class="btn ghost">Edit</a></td>
-                </tr>
-              <% }) %>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Recent Leads -->
-        <div class="card">
-          <h2>Recent Leads</h2>
-          <table class="pc-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Client</th>
-                <th>Contact</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% if (!leads.length) { %>
-                <tr><td colspan="4" class="muted">No new leads</td></tr>
-              <% } %>
-              <% leads.forEach(ld => { %>
-                <tr>
-                  <td><%= ld.desired_start?.toISOString().slice(0,10) %></td>
-                  <td><strong><%= ld.client_name %></strong></td>
-                  <td>
-                    <%= ld.client_email || '' %>
-                    <% if (ld.client_phone) { %><br><span class="muted"><%= ld.client_phone %></span><% } %>
-                  </td>
-                  <td><span class="pill <%= ld.status %>"><%= ld.status %></span></td>
-                </tr>
-              <% }) %>
-            </tbody>
-          </table>
-        </div>
-
+            <% }) %>
+          </tbody>
+        </table>
       </div>
 
-      <!-- Sidebar -->
-      <div style="flex:1; margin-left:20px; min-width:250px;">
-        <div class="card">
-          <h3>My Tasks</h3>
-          <% if (!tasks.length) { %>
-            <div class="muted">No open tasks</div>
-          <% } else { %>
-            <ul style="margin:0; padding-left:16px;">
-              <% tasks.forEach(t => { %>
-                <li>
-                  <strong><%= t.title %></strong>
-                  <% if (t.assignee) { %> <span class="muted">· <%= t.assignee %></span><% } %>
-                  <% if (t.due_at) { %><br><span class="muted">Due: <%= t.due_at.toISOString().slice(0,10) %></span><% } %>
-                </li>
-              <% }) %>
-            </ul>
-          <% } %>
-        </div>
+      <!-- Recent Leads -->
+      <div class="card">
+        <h2>Recent Leads</h2>
+        <table class="pc-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Client</th>
+              <th>Contact</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!leads.length) { %>
+              <tr><td colspan="4" class="muted">No new leads</td></tr>
+            <% } %>
+            <% leads.forEach(ld => { %>
+              <tr>
+                <td><%= ld.desired_start_str %></td>
+                <td><strong><%= ld.client_name %></strong></td>
+                <td>
+                  <%= ld.client_email || '' %>
+                  <% if (ld.client_phone) { %><br><span class="muted"><%= ld.client_phone %></span><% } %>
+                </td>
+                <td><span class="pill <%= ld.status %>"><%= ld.status %></span></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
       </div>
 
+    </div>
+
+    <!-- Sidebar -->
+    <div style="flex:1; margin-left:20px; min-width:250px;">
+      <div class="card">
+        <h3>My Tasks</h3>
+        <% if (!tasks.length) { %>
+          <div class="muted">No open tasks</div>
+        <% } else { %>
+          <ul style="margin:0; padding-left:16px;">
+            <% tasks.forEach(t => { %>
+              <li>
+                <strong><%= t.title %></strong>
+                <% if (t.assignee) { %> <span class="muted">· <%= t.assignee %></span><% } %>
+                <% if (t.due_at_str) { %><br><span class="muted">Due: <%= t.due_at_str %></span><% } %>
+              </li>
+            <% }) %>
+          </ul>
+        <% } %>
+      </div>
     </div>
 
   </div>
-</body>
-</html>
+
+</div>
+
+
 
