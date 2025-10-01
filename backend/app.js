@@ -1,10 +1,21 @@
 // backend/app.js
+
 const path = require("path");
+
+// ---- Load env FIRST ----
+require("dotenv").config({ path: path.join(__dirname, ".env") });
+console.log("[env] DATABASE_URL:", process.env.DATABASE_URL);
+
+// ---- Core imports ----
 const express = require("express");
 const session = require("express-session");
-const pool = require("./db");
+
+// Middleware
 const { requireLogin } = require("./Middleware/authMiddleware");
-require("dotenv").config({ path: path.join(__dirname, ".env") });
+
+// DB
+const pool = require("./db");
+
 
 // Utility: safely load optional routes
 function safeRequire(p) {
